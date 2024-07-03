@@ -1,0 +1,122 @@
+INFO:root:** Searching for valid configuration using delta-debugging algorithm
+INFO:root:-------- running config 0 --------
+INFO:root:within err threshold: true, error =  5.3579185532726E-10
+INFO:root:runtime: 39588700.0
+INFO:root:Average runtime = 39588700.0 s
+INFO:root:-------- running config 1 --------
+INFO:root:within err threshold: true, error =  5.3579080061539E-10
+INFO:root:runtime: 16429100.0
+INFO:root:runtime = 16429100.0 s
+INFO:root:-------- running config 2 --------
+INFO:root:within err threshold: true, error =  6.4187044568342E-10
+INFO:root:runtime: 10503700.0
+INFO:root:runtime = 10503700.0 s
+INFO:root:-------- running config 3 --------
+INFO:root:within err threshold: false, error =  4.4388510492262E+14
+INFO:root:runtime: 3739010.0
+INFO:root:runtime = 3739010.0 s
+INFO:root:-------- running config 4 --------
+INFO:root:within err threshold: true, error =  6.0399435453107E-10
+INFO:root:runtime: 10503700.0
+INFO:root:runtime = 10503700.0 s
+INFO:root:-------- running config 5 --------
+INFO:root:within err threshold: true, error =  5.2006460249387E-10
+INFO:root:runtime: 10503700.0
+INFO:root:runtime = 10503700.0 s
+INFO:root:-------- running config 6 --------
+INFO:root:within err threshold: false, error =  4.4388510492262E+14
+INFO:root:runtime: 3739010.0
+INFO:root:runtime = 3739010.0 s
+INFO:root:-------- running config 7 --------
+INFO:root:within err threshold: true, error =  6.4187044568342E-10
+INFO:root:runtime: 10503700.0
+INFO:root:runtime = 10503700.0 s
+INFO:root:-------- running config 8 --------
+INFO:root:within err threshold: true, error =  6.0399435453107E-10
+INFO:root:runtime: 10503700.0
+INFO:root:runtime = 10503700.0 s
+INFO:root:-------- running config 9 --------
+INFO:root:within err threshold: true, error =  5.2006460249387E-10
+INFO:root:runtime: 10503700.0
+INFO:root:runtime = 10503700.0 s
+INFO:root:-------- running config 10 --------
+INFO:root:within err threshold: true, error =  5.5065663140397E-10
+INFO:root:runtime: 10503700.0
+INFO:root:runtime = 10503700.0 s
+INFO:root:-------- running config 11 --------
+INFO:root:within err threshold: false, error =  9.9999900000000E+05
+INFO:root:runtime: 9690060.0
+INFO:root:runtime = 9690060.0 s
+INFO:root:-------- running config 12 --------
+INFO:root:within err threshold: false, error =  9.9999900000000E+05
+INFO:root:runtime: 10096900.0
+INFO:root:runtime = 10096900.0 s
+INFO:root:-------- running config 13 --------
+INFO:root:within err threshold: true, error =  4.9259823997616E-10
+INFO:root:runtime: 10503700.0
+INFO:root:runtime = 10503700.0 s
+INFO:root:-------- running config 14 --------
+INFO:root:within err threshold: false, error =  4.4388510492262E+14
+INFO:root:runtime: 3739010.0
+INFO:root:runtime = 3739010.0 s
+INFO:root:-------- running config 15 --------
+INFO:root:within err threshold: true, error =  6.4187044568342E-10
+INFO:root:runtime: 10503700.0
+INFO:root:runtime = 10503700.0 s
+INFO:root:-------- running config 16 --------
+INFO:root:within err threshold: false, error =  4.4388510492262E+14
+INFO:root:runtime: 3739010.0
+INFO:root:runtime = 3739010.0 s
+INFO:root:-------- running config 17 --------
+INFO:root:within err threshold: true, error =  6.4187044568342E-10
+INFO:root:runtime: 10503700.0
+INFO:root:runtime = 10503700.0 s
+INFO:root:-------- running config 18 --------
+INFO:root:within err threshold: true, error =  6.0399435453107E-10
+INFO:root:runtime: 10503700.0
+INFO:root:runtime = 10503700.0 s
+INFO:root:-------- running config 19 --------
+INFO:root:within err threshold: true, error =  5.2006460249387E-10
+INFO:root:runtime: 10503700.0
+INFO:root:runtime = 10503700.0 s
+INFO:root:-------- running config 20 --------
+INFO:root:within err threshold: false, error =  4.4388510492262E+14
+INFO:root:runtime: 3739010.0
+INFO:root:runtime = 3739010.0 s
+INFO:root:-------- running config 21 --------
+INFO:root:within err threshold: true, error =  6.4187044568342E-10
+INFO:root:runtime: 10503700.0
+INFO:root:runtime = 10503700.0 s
+INFO:root:-------- running config 22 --------
+INFO:root:within err threshold: true, error =  5.5065663140397E-10
+INFO:root:runtime: 10503700.0
+INFO:root:runtime = 10503700.0 s
+INFO:root:-------- running config 23 --------
+INFO:root:within err threshold: false, error =  9.9999900000000E+05
+INFO:root:runtime: 9690060.0
+INFO:root:runtime = 9690060.0 s
+INFO:root:-------- running config 24 --------
+INFO:root:within err threshold: false, error =  4.4388510492262E+14
+INFO:root:runtime: 3739010.0
+INFO:root:runtime = 3739010.0 s
+INFO:root:-------- running config 25 --------
+INFO:root:within err threshold: true, error =  6.4187044568342E-10
+INFO:root:runtime: 10503700.0
+INFO:root:runtime = 10503700.0 s
+INFO:root:-------- running config 26 --------
+INFO:root:within err threshold: false, error =  9.9999900000000E+05
+INFO:root:runtime: 9690060.0
+INFO:root:runtime = 9690060.0 s
+INFO:root:-------- running config 27 --------
+INFO:root:within err threshold: true, error =  3.2839883590263E-10
+INFO:root:runtime: 10503700.0
+INFO:root:runtime = 10503700.0 s
+INFO:root:-------- running config 28 --------
+INFO:root:within err threshold: false, error =  9.9999900000000E+05
+INFO:root:runtime: 10096900.0
+INFO:root:runtime = 10096900.0 s
+INFO:root:-------- running config 29 --------
+INFO:root:within err threshold: true, error =  5.2991627752519E-10
+INFO:root:runtime: 10503700.0
+INFO:root:runtime = 10503700.0 s
+INFO:root:Check dd2_valid_GMRES_IR.json for the valid configuration file

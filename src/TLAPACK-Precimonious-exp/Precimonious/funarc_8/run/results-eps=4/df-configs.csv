@@ -1,0 +1,8 @@
+,benchmark,label,runtime,runtime_label,error,error_label
+0,funarc_8,VALID,4.0,0, 0.0000000000000E+00,1
+1,funarc_8,FAIL,9999.0,0,,0
+2,funarc_8,FAIL,9999.0,0,,0
+3,funarc_8,FAIL,9999.0,0,,0
+4,funarc_8,FAIL,9999.0,0,,0
+5,funarc_8,FAIL,9999.0,0,,0
+6,funarc_8,FAIL,9999.0,0,,0

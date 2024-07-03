@@ -1,0 +1,46 @@
+INFO:root:** Searching for valid configuration using delta-debugging algorithm
+INFO:root:-------- running config 0 --------
+INFO:root:within err threshold: true, zeta =  5.7957763224129E+00, error =  2.4825820733454E-14
+INFO:root:runtime: 80.0
+INFO:root:Average runtime = 80.0 s
+INFO:root:-------- running config 1 --------
+INFO:root:within err threshold: true, zeta =  5.7957763224130E+00, error =  4.4441284029022E-15
+INFO:root:runtime: 40.0
+INFO:root:runtime = 40.0 s
+INFO:root:-------- running config 2 --------
+INFO:root:within err threshold: true, zeta =  5.8011102676392E+00, error =  9.2031592136032E-04
+INFO:root:runtime: 20.0
+INFO:root:runtime = 20.0 s
+INFO:root:-------- running config 3 --------
+INFO:root:within err threshold: false, zeta =                  NAN, error =                  NAN
+INFO:root:runtime: 5.0
+INFO:root:runtime = 5.0 s
+INFO:root:-------- running config 4 --------
+INFO:root:within err threshold: true, zeta =  0.0000000000000E+00, error =  1.0000000000000E+00
+INFO:root:runtime: 14.0
+INFO:root:runtime = 14.0 s
+INFO:root:-------- running config 5 --------
+INFO:root:within err threshold: false, zeta =                  NAN, error =                  NAN
+INFO:root:runtime: 11.0
+INFO:root:runtime = 11.0 s
+INFO:root:-------- running config 6 --------
+INFO:root:within err threshold: true, zeta =  0.0000000000000E+00, error =  1.0000000000000E+00
+INFO:root:runtime: 11.0
+INFO:root:runtime = 11.0 s
+INFO:root:-------- running config 7 --------
+INFO:root:within err threshold: false, zeta =                  NAN, error =                  NAN
+INFO:root:runtime: 8.0
+INFO:root:runtime = 8.0 s
+INFO:root:-------- running config 8 --------
+INFO:root:within err threshold: true, zeta =  0.0000000000000E+00, error =  1.0000000000000E+00
+INFO:root:runtime: 8.0
+INFO:root:runtime = 8.0 s
+INFO:root:-------- running config 9 --------
+INFO:root:within err threshold: false, zeta =                  NAN, error =                  NAN
+INFO:root:runtime: 8.0
+INFO:root:runtime = 8.0 s
+INFO:root:-------- running config 10 --------
+INFO:root:within err threshold: true, zeta =  0.0000000000000E+00, error =  1.0000000000000E+00
+INFO:root:runtime: 8.0
+INFO:root:runtime = 8.0 s
+INFO:root:Check dd2_valid_funarc_8.json for the valid configuration file

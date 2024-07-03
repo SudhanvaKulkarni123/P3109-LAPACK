@@ -1,0 +1,4 @@
+INFO:root:** Searching for valid configuration using delta-debugging algorithm
+INFO:root:-------- running config 0 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0

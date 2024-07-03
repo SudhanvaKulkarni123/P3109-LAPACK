@@ -1,0 +1,6 @@
+INFO:root:** Searching for valid configuration using delta-debugging algorithm
+INFO:root:-------- running config 0 --------
+INFO:root:within err threshold: true, zeta =  0.0000000000000E+00, error =  1.0000000000000E+00
+INFO:root:runtime: 4.0
+INFO:root:Average runtime = 4.0 s
+INFO:root:-------- running config 1 --------

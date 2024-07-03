@@ -1,0 +1,13 @@
+{
+    "funarc.c": {
+        "function": {
+            "main": [
+                "epsilon",
+                "zeta_verify_value"
+            ],
+            "fun": [
+                ""
+            ]
+        }
+    }
+}

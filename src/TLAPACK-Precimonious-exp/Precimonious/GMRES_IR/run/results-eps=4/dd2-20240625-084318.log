@@ -1,0 +1,30 @@
+INFO:root:** Searching for valid configuration using delta-debugging algorithm
+INFO:root:-------- running config 0 --------
+INFO:root:within err threshold: true, error =  6.1020744013263E-10
+INFO:root:runtime: 6743460.0
+INFO:root:Average runtime = 6743460.0 s
+INFO:root:-------- running config 1 --------
+INFO:root:within err threshold: true, error =  5.3579185532726E-10
+INFO:root:runtime: 4319040.0
+INFO:root:runtime = 4319040.0 s
+INFO:root:-------- running config 2 --------
+INFO:root:within err threshold: true, error = -1.0000000000000E+00
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 3 --------
+INFO:root:within err threshold: true, error =  5.9532428986486E-10
+INFO:root:runtime: 3106830.0
+INFO:root:runtime = 3106830.0 s
+INFO:root:-------- running config 4 --------
+INFO:root:within err threshold: false, error =  9.9999900000000E+05
+INFO:root:runtime: 2500720.0
+INFO:root:runtime = 2500720.0 s
+INFO:root:-------- running config 5 --------
+INFO:root:within err threshold: false, error =  9.9999900000000E+05
+INFO:root:runtime: 3101830.0
+INFO:root:runtime = 3101830.0 s
+INFO:root:-------- running config 6 --------
+INFO:root:within err threshold: false, error =  9.9999900000000E+05
+INFO:root:runtime: 2390600.0
+INFO:root:runtime = 2390600.0 s
+INFO:root:No valid and speedup configuration file!

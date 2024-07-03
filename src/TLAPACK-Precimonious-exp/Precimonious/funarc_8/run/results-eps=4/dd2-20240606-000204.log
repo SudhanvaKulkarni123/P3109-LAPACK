@@ -1,0 +1,18 @@
+INFO:root:** Searching for valid configuration using delta-debugging algorithm
+INFO:root:-------- running config 0 --------
+INFO:root:within err threshold: true, zeta =  5.7957763224129E+00, error =  2.4825820733454E-14
+INFO:root:runtime: 80.0
+INFO:root:Average runtime = 80.0 s
+INFO:root:-------- running config 1 --------
+INFO:root:within err threshold: true, zeta =  5.7957763224130E+00, error =  4.4441284029022E-15
+INFO:root:runtime: 40.0
+INFO:root:runtime = 40.0 s
+INFO:root:-------- running config 2 --------
+INFO:root:within err threshold: true, zeta =  5.8011102676392E+00, error =  9.2031592136032E-04
+INFO:root:runtime: 20.0
+INFO:root:runtime = 20.0 s
+INFO:root:-------- running config 3 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 4 --------

@@ -1,0 +1,10 @@
+INFO:root:** Searching for valid configuration using delta-debugging algorithm
+INFO:root:-------- running config 0 --------
+INFO:root:within err threshold: true, zeta =  5.7957763224130E+00, error =  4.4441284029022E-15
+INFO:root:runtime: 32.985137
+INFO:root:Average runtime = 32.985137 s
+INFO:root:-------- running config 1 --------
+INFO:root:within err threshold: true, zeta =  5.7957763224130E+00, error =  4.4441284029022E-15
+INFO:root:runtime: 33.079574
+INFO:root:runtime = 33.079574 s
+INFO:root:Check dd2_valid_funarc.json for the valid configuration file

@@ -1,0 +1,38 @@
+INFO:root:** Searching for valid configuration using delta-debugging algorithm
+INFO:root:-------- running config 0 --------
+INFO:root:within err threshold: true, error =  9.8377223561088E-20
+INFO:root:runtime: 9999.0
+INFO:root:Average runtime = 9999.0 s
+INFO:root:-------- running config 1 --------
+INFO:root:within err threshold: true, error =  3.5719457947003E-10
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 2 --------
+INFO:root:within err threshold: false, error =  9.9999900000000E+05
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 3 --------
+INFO:root:within err threshold: true, error =  4.7625942078966E-10
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 4 --------
+INFO:root:within err threshold: true, error =  5.3579185532726E-10
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 5 --------
+INFO:root:within err threshold: true, error =  4.6881787341135E-10
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 6 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 7 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 8 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:Check dd2_valid_GMRES_IR.json for the valid configuration file

@@ -1,0 +1,52 @@
+{
+    "localVar1": {
+        "file": "funarc_8.cpp",
+        "function": "main",
+        "lines": [
+            "118"
+        ],
+        "location": "localVar",
+        "name": "h",
+        "type": "float8_ieee_p<4>"
+    },
+    "localVar2": {
+        "file": "funarc_8.cpp",
+        "function": "main",
+        "lines": [
+            "119"
+        ],
+        "location": "localVar",
+        "name": "t1",
+        "type": "float8_ieee_p<4>"
+    },
+    "localVar3": {
+        "file": "funarc_8.cpp",
+        "function": "main",
+        "lines": [
+            "120"
+        ],
+        "location": "localVar",
+        "name": "t2",
+        "type": "float"
+    },
+    "localVar4": {
+        "file": "funarc_8.cpp",
+        "function": "main",
+        "lines": [
+            "121"
+        ],
+        "location": "localVar",
+        "name": "dppi",
+        "type": "float"
+    },
+    "localVar5": {
+        "file": "funarc_8.cpp",
+        "function": "main",
+        "lines": [
+            "122"
+        ],
+        "location": "localVar",
+        "name": "s1",
+        "type": "float"
+    }
+}
