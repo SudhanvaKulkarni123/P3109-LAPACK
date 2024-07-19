@@ -1,0 +1,54 @@
+INFO:root:** Searching for valid configuration using delta-debugging algorithm
+INFO:root:-------- running config 0 --------
+INFO:root:within err threshold: true, zeta =  5.7957763224130E+00, error =  4.4441284029022E-15
+INFO:root:runtime: 33.148736
+INFO:root:Average runtime = 33.148736 s
+INFO:root:-------- running config 1 --------
+INFO:root:within err threshold: false, zeta =  5.8011102676392E+00, error =  9.2031591339037E-04
+INFO:root:runtime: 18.160336
+INFO:root:runtime = 18.160336 s
+INFO:root:-------- running config 2 --------
+INFO:root:within err threshold: true, zeta =  5.7961954920469E+00, error =  7.2323293818968E-05
+INFO:root:runtime: 34.773518
+INFO:root:runtime = 34.773518 s
+INFO:root:-------- running config 3 --------
+INFO:root:within err threshold: false, zeta =  5.8010807037354E+00, error =  9.1521500144154E-04
+INFO:root:runtime: 23.908656
+INFO:root:runtime = 23.908656 s
+INFO:root:-------- running config 4 --------
+INFO:root:within err threshold: false, zeta =  5.8009939193726E+00, error =  9.0024125529453E-04
+INFO:root:runtime: 37.296101
+INFO:root:runtime = 37.296101 s
+INFO:root:-------- running config 5 --------
+INFO:root:within err threshold: true, zeta =  5.7962059933527E+00, error =  7.4135183245846E-05
+INFO:root:runtime: 18.900324
+INFO:root:runtime = 18.900324 s
+INFO:root:-------- running config 6 --------
+INFO:root:within err threshold: false, zeta =  5.7971277656409E+00, error =  2.3317725748898E-04
+INFO:root:runtime: 18.23988
+INFO:root:runtime = 18.23988 s
+INFO:root:-------- running config 7 --------
+INFO:root:within err threshold: false, zeta =  5.8005399703979E+00, error =  8.2191714318469E-04
+INFO:root:runtime: 18.656652
+INFO:root:runtime = 18.656652 s
+INFO:root:-------- running config 8 --------
+INFO:root:within err threshold: false, zeta =  5.7971277656409E+00, error =  2.3317725572269E-04
+INFO:root:runtime: 18.467958
+INFO:root:runtime = 18.467958 s
+INFO:root:-------- running config 9 --------
+INFO:root:within err threshold: false, zeta =  5.8005399703979E+00, error =  8.2191715483002E-04
+INFO:root:runtime: 19.362576
+INFO:root:runtime = 19.362576 s
+INFO:root:-------- running config 10 --------
+INFO:root:within err threshold: false, zeta =  5.8011102676392E+00, error =  9.2031592136032E-04
+INFO:root:runtime: 18.213011
+INFO:root:runtime = 18.213011 s
+INFO:root:-------- running config 11 --------
+INFO:root:within err threshold: true, zeta =  5.7962059933527E+00, error =  7.4135183240287E-05
+INFO:root:runtime: 18.7271
+INFO:root:runtime = 18.7271 s
+INFO:root:-------- running config 12 --------
+INFO:root:within err threshold: false, zeta =  5.8005399703979E+00, error =  8.2191714318469E-04
+INFO:root:runtime: 18.72061
+INFO:root:runtime = 18.72061 s
+INFO:root:-------- running config 13 --------

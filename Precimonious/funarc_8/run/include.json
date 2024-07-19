@@ -1,0 +1,17 @@
+{
+    "funarc_8.cpp": {
+        "function": {
+            "main": [
+                "epsilon",
+                "zeta_verify_value",
+                "err",
+                "cpu_time_used",
+                "start_time",
+                "end_time"
+            ],
+            "fun": [
+                ""
+            ]
+        }
+    }
+}

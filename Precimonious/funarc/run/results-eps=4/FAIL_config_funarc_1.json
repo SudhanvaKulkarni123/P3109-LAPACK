@@ -1,0 +1,162 @@
+{
+    "call12": {
+        "file": "funarc.c",
+        "function": "main",
+        "lines": [
+            "61"
+        ],
+        "location": "../scripts/funarc.c:61:17",
+        "name": "sqrt",
+        "switch": "sqrtf",
+        "type": [
+            "float",
+            "float"
+        ]
+    },
+    "call4": {
+        "file": "funarc.c",
+        "function": "fun",
+        "lines": [
+            "20"
+        ],
+        "location": "../scripts/funarc.c:20:15",
+        "name": "sin",
+        "switch": "sinf",
+        "type": [
+            "float",
+            "float"
+        ]
+    },
+    "localVar1": {
+        "file": "funarc.c",
+        "function": "fun",
+        "lines": [
+            "10",
+            "15",
+            "20"
+        ],
+        "location": "parmVar",
+        "name": "x",
+        "type": "float"
+    },
+    "localVar10": {
+        "file": "funarc.c",
+        "function": "main",
+        "lines": [
+            "50",
+            "55",
+            "61",
+            "73",
+            "77",
+            "82",
+            "87"
+        ],
+        "location": "localVar",
+        "name": "s1",
+        "type": "float"
+    },
+    "localVar11": {
+        "file": "funarc.c",
+        "function": "main",
+        "lines": [
+            "71",
+            "73",
+            "74",
+            "78",
+            "88"
+        ],
+        "location": "localVar",
+        "name": "err",
+        "type": "float"
+    },
+    "localVar2": {
+        "file": "funarc.c",
+        "function": "fun",
+        "lines": [
+            "12",
+            "15",
+            "20",
+            "23"
+        ],
+        "location": "localVar",
+        "name": "t1",
+        "type": "float"
+    },
+    "localVar3": {
+        "file": "funarc.c",
+        "function": "fun",
+        "lines": [
+            "13",
+            "19",
+            "20"
+        ],
+        "location": "localVar",
+        "name": "d1",
+        "type": "float"
+    },
+    "localVar5": {
+        "file": "funarc.c",
+        "function": "main",
+        "lines": [
+            "35",
+            "92",
+            "94"
+        ],
+        "location": "localVar",
+        "name": "cpu_time_used",
+        "type": "float"
+    },
+    "localVar6": {
+        "file": "funarc.c",
+        "function": "main",
+        "lines": [
+            "46",
+            "57",
+            "60",
+            "61"
+        ],
+        "location": "localVar",
+        "name": "h",
+        "type": "float"
+    },
+    "localVar7": {
+        "file": "funarc.c",
+        "function": "main",
+        "lines": [
+            "47",
+            "53",
+            "54",
+            "56",
+            "61",
+            "62"
+        ],
+        "location": "localVar",
+        "name": "t1",
+        "type": "float"
+    },
+    "localVar8": {
+        "file": "funarc.c",
+        "function": "main",
+        "lines": [
+            "48",
+            "60",
+            "61",
+            "62"
+        ],
+        "location": "localVar",
+        "name": "t2",
+        "type": "float"
+    },
+    "localVar9": {
+        "file": "funarc.c",
+        "function": "main",
+        "lines": [
+            "49",
+            "54",
+            "57"
+        ],
+        "location": "localVar",
+        "name": "dppi",
+        "type": "float"
+    }
+}
