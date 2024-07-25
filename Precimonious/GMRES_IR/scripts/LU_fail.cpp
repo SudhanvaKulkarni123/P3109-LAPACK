@@ -82,7 +82,7 @@ int main(int argc, char** argv)
     int info = tlapack::getrf(B , piv);
 
     if(info != 0) {
-        std::cout << "Error in getrf" << std::endl;
+        std::cout << "Error in getrf in fp16" << std::endl;
     }   
 
     if(tlapack::getrf(A, piv) ==  0) std::cout << "factorization in fp32 worked" << std::endl;
