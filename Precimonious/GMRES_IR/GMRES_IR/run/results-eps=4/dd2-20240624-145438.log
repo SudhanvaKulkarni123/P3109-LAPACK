@@ -1,0 +1,134 @@
+INFO:root:** Searching for valid configuration using delta-debugging algorithm
+INFO:root:-------- running config 0 --------
+INFO:root:within err threshold: true, error = -1.0000000000000E+00
+INFO:root:runtime: 9999.0
+INFO:root:Average runtime = 9999.0 s
+INFO:root:-------- running config 1 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 2 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 3 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 4 --------
+INFO:root:within err threshold: true, error = -1.0000000000000E+00
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 5 --------
+INFO:root:within err threshold: true, error = -1.0000000000000E+00
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 6 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 7 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 8 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 9 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 10 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 11 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 12 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 13 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 14 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 15 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 16 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 17 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 18 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 19 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 20 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 21 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 22 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 23 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 24 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 25 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 26 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 27 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 28 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 29 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 30 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 31 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 32 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:Check dd2_valid_GMRES_IR.json for the valid configuration file

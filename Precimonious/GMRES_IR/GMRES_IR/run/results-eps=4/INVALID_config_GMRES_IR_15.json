@@ -1,0 +1,82 @@
+{
+    "localVar1": {
+        "file": "gemm.hpp",
+        "function": "gemm",
+        "lines": [
+            "294"
+        ],
+        "location": "localVar",
+        "name": "accum_type",
+        "type": "double"
+    },
+    "localVar2": {
+        "file": "trsm.hpp",
+        "function": "trsm",
+        "lines": [
+            "308"
+        ],
+        "location": "localVar",
+        "name": "accum_type",
+        "type": "float"
+    },
+    "localVar3": {
+        "file": "getrf_recursive.hpp",
+        "function": "getrf_recursive",
+        "lines": [
+            "67"
+        ],
+        "location": "localVar",
+        "name": "gemm_type",
+        "type": "double"
+    },
+    "localVar4": {
+        "file": "getrf_recursive.hpp",
+        "function": "getrf_recursive",
+        "lines": [
+            "68"
+        ],
+        "location": "localVar",
+        "name": "trsm_type_1",
+        "type": "double"
+    },
+    "localVar5": {
+        "file": "getrf_recursive.hpp",
+        "function": "getrf_recursive",
+        "lines": [
+            "69"
+        ],
+        "location": "localVar",
+        "name": "trsm_type_2",
+        "type": "double"
+    },
+    "localVar6": {
+        "file": "gemv.hpp",
+        "function": "gemv",
+        "lines": [
+            "189"
+        ],
+        "location": "localVar",
+        "name": "accum_type",
+        "type": "double"
+    },
+    "localVar7": {
+        "file": "GMRES_IR.cpp",
+        "function": "main",
+        "lines": [
+            "931"
+        ],
+        "location": "localVar",
+        "name": "main_template_arg_1",
+        "type": "double"
+    },
+    "localVar8": {
+        "file": "GMRES_IR.cpp",
+        "function": "main",
+        "lines": [
+            "931"
+        ],
+        "location": "localVar",
+        "name": "main_template_arg_2",
+        "type": "double"
+    }
+}

@@ -1,0 +1,45 @@
+INFO:root:** Searching for valid configuration using delta-debugging algorithm
+INFO:root:-------- running config 0 --------
+INFO:root:within err threshold: true, error =  0.0000000000000E+00
+INFO:root:runtime: 9999.0
+INFO:root:Average runtime = 9999.0 s
+INFO:root:-------- running config 1 --------
+INFO:root:within err threshold: true, error =  0.0000000000000E+00
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 2 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 3 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 4 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 5 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 6 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 7 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 8 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 9 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
+INFO:root:-------- running config 10 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s

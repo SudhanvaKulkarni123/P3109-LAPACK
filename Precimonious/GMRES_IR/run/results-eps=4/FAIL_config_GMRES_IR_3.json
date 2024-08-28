@@ -1,0 +1,22 @@
+{
+    "localVar1": {
+        "file": "GMRES_IR.cpp",
+        "function": "main",
+        "lines": [
+            "931"
+        ],
+        "location": "localVar",
+        "name": "main_template_arg_1",
+        "type": "float"
+    },
+    "localVar2": {
+        "file": "GMRES_IR.cpp",
+        "function": "main",
+        "lines": [
+            "931"
+        ],
+        "location": "localVar",
+        "name": "main_template_arg_2",
+        "type": "double"
+    }
+}

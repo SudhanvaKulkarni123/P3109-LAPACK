@@ -1,0 +1,38 @@
+INFO:root:** Searching for valid configuration using delta-debugging algorithm
+INFO:root:-------- running config 0 --------
+INFO:root:within err threshold: true, error =  5.4695420415030E-10
+INFO:root:runtime: 6743460.0
+INFO:root:Average runtime = 6743460.0 s
+INFO:root:-------- running config 1 --------
+INFO:root:within err threshold: false, error =  5.3629456384000E+10
+INFO:root:runtime: 640040.0
+INFO:root:runtime = 640040.0 s
+INFO:root:-------- running config 2 --------
+INFO:root:within err threshold: true, error =  4.1672701400763E-10
+INFO:root:runtime: 6723460.0
+INFO:root:runtime = 6723460.0 s
+INFO:root:-------- running config 3 --------
+INFO:root:within err threshold: true, error =  5.8788274248656E-10
+INFO:root:runtime: 4339040.0
+INFO:root:runtime = 4339040.0 s
+INFO:root:-------- running config 4 --------
+INFO:root:within err threshold: true, error =  6.5485672440246E-10
+INFO:root:runtime: 3136830.0
+INFO:root:runtime = 3136830.0 s
+INFO:root:-------- running config 5 --------
+INFO:root:within err threshold: true, error =  6.4369443109058E-10
+INFO:root:runtime: 3136830.0
+INFO:root:runtime = 3136830.0 s
+INFO:root:-------- running config 6 --------
+INFO:root:within err threshold: false, error =  9.9999900000000E+05
+INFO:root:runtime: 2420600.0
+INFO:root:runtime = 2420600.0 s
+INFO:root:-------- running config 7 --------
+INFO:root:within err threshold: true, error =  4.1672701400763E-10
+INFO:root:runtime: 3136830.0
+INFO:root:runtime = 3136830.0 s
+INFO:root:-------- running config 8 --------
+INFO:root:within err threshold: false, error =  9.9999900000000E+05
+INFO:root:runtime: 2420600.0
+INFO:root:runtime = 2420600.0 s
+INFO:root:Check dd2_valid_GMRES_IR.json for the valid configuration file

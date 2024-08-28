@@ -1,0 +1,62 @@
+{
+    "localVar1": {
+        "file": "gemm.hpp",
+        "function": "gemm",
+        "lines": [
+            "284"
+        ],
+        "location": "localVar",
+        "name": "accum_type",
+        "type": "float"
+    },
+    "localVar2": {
+        "file": "trsm.hpp",
+        "function": "trsm",
+        "lines": [
+            "303"
+        ],
+        "location": "localVar",
+        "name": "accum_type",
+        "type": "float"
+    },
+    "localVar3": {
+        "file": "gemv.hpp",
+        "function": "gemv",
+        "lines": [
+            "185"
+        ],
+        "location": "localVar",
+        "name": "accum_type",
+        "type": "double"
+    },
+    "localVar4": {
+        "file": "ger.hpp",
+        "function": "ger",
+        "lines": [
+            "68"
+        ],
+        "location": "localVar",
+        "name": "tmp",
+        "type": "Eigen::half"
+    },
+    "localVar5": {
+        "file": "GMRES_IR.cpp",
+        "function": "main",
+        "lines": [
+            "846"
+        ],
+        "location": "localVar",
+        "name": "main_template_arg_1",
+        "type": "ml_dtypes::float8_ieee_p<4>"
+    },
+    "localVar6": {
+        "file": "GMRES_IR.cpp",
+        "function": "main",
+        "lines": [
+            "846"
+        ],
+        "location": "localVar",
+        "name": "main_template_arg_2",
+        "type": "Eigen::half"
+    }
+}

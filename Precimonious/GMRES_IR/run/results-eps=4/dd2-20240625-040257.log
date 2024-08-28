@@ -1,0 +1,9 @@
+INFO:root:** Searching for valid configuration using delta-debugging algorithm
+INFO:root:-------- running config 0 --------
+INFO:root:within err threshold: true, error =  1.0815188761266E-19
+INFO:root:runtime: 9999.0
+INFO:root:Average runtime = 9999.0 s
+INFO:root:-------- running config 1 --------
+INFO:root:segmentation fault
+INFO:root:runtime: 9999.0
+INFO:root:runtime = 9999.0 s
