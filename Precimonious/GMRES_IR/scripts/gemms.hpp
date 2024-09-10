@@ -139,6 +139,8 @@ void block_gemm(matrixA_t& A, matrixA_t& B, matrixA_t& C, matrixB_t& A_dtype, ma
 
 }
 
+
+
 /// @brief preforms C = C + AB using mocroscaling format. A and B get common exp over a 4-by-4 block 
 /// @tparam matrix_t
 /// @param A
