@@ -24,6 +24,7 @@
 #include <tlapack/lapack/lange.hpp>
 #include <tlapack/blas/trsm.hpp>
 #include <tlapack/blas/trmm.hpp>
+#include <tlapack/blas/trmv.hpp>
 #include "gemms.hpp"
 #include "pivoted_cholesky.hpp"
 #include <iostream>
@@ -334,27 +335,28 @@ CG_IR(size_t n, double scale, float cond, factorization_type fact_type, double s
 
     
     
-    // r = b - A * x (initial residual, but with x = 0, r = b)
-    for(int i = 0; i < n; i++)  r[i] = x[i];
-    tlapack::gemv(tlapack::NO_TRANS, -1.0, FG, b, r);       // r = b - Ax
-
-    //precondition r
-    for (int i = 0; i < n; i++) {
-        if( left_piv[i] != i) {
-            auto tmp = r[right_piv[i]];
-            r[right_piv[i]] = r[i];
-            r[i] = tmp;
-        }
-    }
-    tlapack::trsv(tlapack::LOWER_TRIANGLE, tlapack::NO_TRANS, Diag::NonUnit, LL, r);
-
-
-    double old_rho = tlapack::nrm2(r);
-    double new_rho = old_rho;
+    
 
     int count = 0;
 
     for(int j = 0; j < max_CG_iter; j++) {
+        // r = b - A * x (initial residual, but with x = 0, r = b)
+        for(int i = 0; i < n; i++)  r[i] = x[i];
+        tlapack::gemv(tlapack::NO_TRANS, -1.0, FG, b, r);       // r = b - Ax
+
+        //precondition r
+        for (int i = 0; i < n; i++) {
+            if( left_piv[i] != i) {
+                auto tmp = r[right_piv[i]];
+                r[right_piv[i]] = r[i];
+                r[i] = tmp;
+            }
+        }
+        tlapack::trsv(tlapack::LOWER_TRIANGLE, tlapack::NO_TRANS, Diag::NonUnit, LL, r);
+
+
+        double old_rho = tlapack::nrm2(r);
+        double new_rho = old_rho;
     
     for (int iter = 0; iter < n; ++iter) {
 
@@ -398,7 +400,7 @@ CG_IR(size_t n, double scale, float cond, factorization_type fact_type, double s
 
 
 
-        // alpha = rsold / (p^T * A * p)
+        // alpha = rsold / (p^T * inv(L)* A* inv(L) * p)
         double pAp = tlapack::dot(Ap, p);
         double alpha = new_rho / pAp;
 
@@ -421,24 +423,28 @@ CG_IR(size_t n, double scale, float cond, factorization_type fact_type, double s
             std::cout << "Converged to Single in " << iter + 1 << " iterations." << endl;
         }
 
-        // Solve L * z = r (Forward substitution)
-        tlapack::trsv(Uplo::Lower, tlapack::NO_TRANS, Diag::NonUnit, LL, r);
-        // Solve L^T * z = r (Backward substitution)
-        tlapack::trsv(Uplo::Lower, tlapack::TRANSPOSE, Diag::NonUnit, LL, r);
 
-        // Compute new rsnew = r^T * z
-        double rsnew = tlapack::dot(r, z);
-
-        // p = z + (rsnew / rsold) * p
-        double beta = rsnew / rsold;
-        tlapack::scal(beta, p);  // p = beta * p
-        tlapack::axpy(beta, p, z);  // p = z + beta * p
-
-        // Update rsold
-        rsold = rsnew;
+        old_rho = new_rho;
+        new_rho = tlapack::nrm2(r);
 
         count++;
     }
+
+    //now need to adjust the soln by trmv and permute
+    for(int i = 0; i < n; i++) solved_r[i] = r[i];
+    for (int i = 0; i < n; i++)
+        {
+            if (right_piv[i] != i)
+            {
+                auto tmp = solved_r[right_piv[i]];
+                solved_r[right_piv[i]] = solved_r[i];
+                solved_r[i] = tmp;
+            }
+        }
+
+    tlapack::trmv(Uplo::Lower, Op::Trans, Diag::NonUnit, LL, solved_r);
+
+    tlapack::axpy(1.0, solved_r, x);
 
     }
 
