@@ -3,7 +3,7 @@
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
 #define TLAPACK_PREFERRED_MATRIX_LEGACY
-#include "flops.h"
+#include "num_ops.hpp"
 #include <tlapack/plugins/legacyArray.hpp>
 #include <tlapack/plugins/stdvector.hpp>
 #include <tlapack/plugins/float8_iee_p.hpp>
@@ -25,6 +25,7 @@
 #include <tlapack/blas/trmm.hpp>
 #include "gemms.hpp"
 #include "getrf_blocked.hpp"
+#include "pivoted_cholesky.hpp"
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -38,105 +39,15 @@
 #include "GMRES.hpp"
 #include "scalings.hpp"
 #include "json.hpp"
+#include "getrf_random.hpp"
 #include <fstream>
+#include "python_utils.hpp"
 
 using namespace Eigen;
 using namespace ml_dtypes;
 
 enum class factorization_type { standard_LU, two_prec_LU, three_prec_LU, low_prec_store_LU, scaled_two_prec_store_LU, block_low_prec_LU};
 enum class pivoting_scheme { partial, complete, none};
-
-
-
-// template <typename matrix_t>
-// void printMatrix(const matrix_t& A)
-// {
-//     using idx_t = tlapack::size_type<matrix_t>;
-//     const idx_t m = tlapack::nrows(A);
-//     const idx_t n = tlapack::ncols(A);
-
-//     for (idx_t i = 0; i < m; ++i) {
-//         std::cout << std::endl;
-//         for (idx_t j = 0; j < n; ++j)
-//             std::cout << A(i, j) << " ";
-//     }
-// }
-
-//-------------------------------------------------------------------
-
-template<typename matrix_t>
-void isZero(const matrix_t& A)
-{
-    using real_t = type_t<matrix_t>;
-    for(int i = 0; i < nrows(A); i++){
-        for(int j = 0; j < ncols(A); j++){
-            if(A(i,j) != real_t(0)) { std::cout << "Not zero mat" << std::endl; return;}
-        }
-    }
-    std::cout << "Zero mat" << std::endl;
-
-}
-
-template<typename matrix_t>
-void PrintAllExp(matrix_t& A, Layout L)
-{   
-    using real_t = type_t<matrix_t>;
-    
-    real_t maxim = real_t(0);
-    if(L == Layout::ColMajor){
-    std::cout << "Printing all column exponents" << std::endl;
-    for(int j = 0; j < ncols(A); j++) {
-    for(int i = 0; i < nrows(A); i++) {
-            if (abs(A(i,j)) > maxim) maxim = abs(A(i,j));
-        }
-        std::cout << int(floor((log2(maxim)))) << std::endl;
-        maxim = real_t(0);
-    
-    }
-    }
-    else if(L == Layout::RowMajor){
-    std::cout << "Printing all row exponents" << std::endl;
-    for(int i = 0; i < ncols(A); i++) {
-        for(int j = 0; j < nrows(A); j++) {
-            if (abs(A(j,i)) > maxim) maxim = abs(A(j,i));
-        }
-        std::cout << floor(float(log2(maxim))) << std::endl;
-        real_t maxim = real_t(0);
-    }
-    }
-    std::cout << "End of exponents" << std::endl;
-
-    return;
-
-}
-
-template<typename T>
-T get_machine_epsilon()
-{
-    double eps = 1.0;
-    while (static_cast<T>(1.0 + 0.5 * eps) != static_cast<T>(1.0))
-        eps *= (0.5);
-    return static_cast<T>(eps);
-}
-
-template <typename matrix_t>
-bool check_matrix(const matrix_t& A)
-{
-    using T = type_t<matrix_t>;
-    for(int i = 0; i < nrows(A); i++){
-        for(int j = 0; j < ncols(A); j++){
-            if(abs(A(i,j)) > T(1.0)) return false;
-        }
-    }
-
-    return true;
-}
-
-
-
-
-
-
 
 
 
@@ -153,184 +64,18 @@ void printVector(vectr_t& v)
 
 
 
-
-//------------------------------------------------------------------------------
-
-#ifdef PY_SSIZE_T_CLEAN
-//------------------------------------------------------------------------------
-template<typename T>
-std::vector<T> convertPythonListToVector(std::vector<T>& vec,PyObject* pyList) {
-
-    if (!PyList_Check(pyList)) return vec;
-
-    Py_ssize_t size = PyList_Size(pyList);
-    for (Py_ssize_t i = 0; i < size; ++i) {
-        PyObject* item = PyList_GetItem(pyList, i);
-        vec.push_back(static_cast<T>(PyFloat_AsDouble(item)));
-    }
-
-    return vec;
-}
-
-
-template<typename T, typename matrix_t>
-int constructMatrix(int n, float cond, int space, bool geom, matrix_t& A, int p, float& true_cond) {
-    //this is an ambitious function that uses a Python embedding to call the functions found in generate\ copy.py to fill in the entries of A
-    
-    PyObject *pName, *pModule, *pFunc;
-    PyObject *pArgs, *pValue;
-    int i;
-    setenv("PYTHONPATH", ".", 1);
-    Py_Initialize();
-    pName = PyUnicode_DecodeFSDefault((char*)"gen");
-    pModule = PyImport_Import(pName); 
-    Py_DECREF(pName);
-    if (pModule != NULL) {
-        pFunc = PyObject_GetAttrString(pModule, (char *)"LU_gen");
-
-        if (pFunc && PyCallable_Check(pFunc)) {
-            pArgs = PyTuple_New(5);
-            for (i = 0; i < 5; ++i) {
-                switch(i) {
-                    case 0:
-                        pValue = PyLong_FromLong(n);
-                        break;
-                    case 1:
-                        pValue = PyFloat_FromDouble(cond);
-                        break;
-                    case 2:
-                        pValue = PyLong_FromLong(space);
-                        break;
-                    case 3:
-                        pValue = geom ? Py_True : Py_False;
-                        break;
-                    default:
-                        pValue = PyLong_FromLong(p);
-                        break;
-                }
-                
-                if (!pValue) {
-                    Py_DECREF(pArgs);
-                    Py_DECREF(pModule);
-                    fprintf(stderr, "Cannot convert argument\n");
-                    return 1;
-                }
-                /* pValue reference stolen here: */
-                PyTuple_SetItem(pArgs, i, pValue);
-            }
-            pValue = PyObject_CallObject(pFunc, pArgs);
-            Py_DECREF(pArgs);
-            if (pValue != NULL) {
-                std::vector<T> b(n*n);
-                std::vector<T> c(n*n + 1);
-                for(int i = 0 ; i < n; i++) {
-                    for(int j = 0; j < n; j++){
-                        A(i,j) = static_cast<float>(static_cast<T>(PyFloat_AsDouble(PyList_GetItem(pValue, n*i + j))));
-                    }
-                }
-
-                
-                // tlapack::LegacyMatrix<T, int> LU(n, n, b.data(), n);
-                // printMatrix(LU);
-                true_cond = PyFloat_AsDouble(PyList_GetItem(pValue, n*n));
-                std::cout << true_cond << std::endl;
-                Py_DECREF(pValue);
-            }
-            else {
-                Py_DECREF(pFunc);
-                Py_DECREF(pModule);
-                PyErr_Print();
-                fprintf(stderr,"Call failed\n");
-                return 1;
-            }
-        }
-        else {
-            if (PyErr_Occurred())
-                PyErr_Print();
-            fprintf(stderr, "Cannot find function for gen\n");
-        }
-        Py_XDECREF(pFunc);
-        Py_DECREF(pModule);
-    }
-    else {
-        PyErr_Print();
-        fprintf(stderr, "Failed to load program\n");
-        return 1;
-    }
-    if (Py_FinalizeEx() < 0) {
-        return 120;
-    }
-    return 0;
-    } 
-
-#else
- std::vector<float> getFileNames(const std::string& directory, float& true_cond) {
-        std::vector<float> fileNames;
-        for (const auto& entry : std::filesystem::directory_iterator(directory)) {
-            if (entry.is_regular_file()) {
-                std::string fileName = entry.path().filename().string();
-                fileName = fileName.substr(7, fileName.size() - 11); 
-                true_cond = std::stof(fileName);
-                fileNames.push_back(true_cond);
-            }
-        }
-        return fileNames;
-    }
-
-float find_closest(const std::vector<float>& fileNames, float true_cond) {
-    float min_diff = std::abs(fileNames[0] - true_cond);
-    float closest = fileNames[0];
-    for (int i = 1; i < fileNames.size(); i++) {
-        float diff = std::abs(fileNames[i] - true_cond);
-        if (diff < min_diff) {
-            min_diff = diff;
-            closest = fileNames[i];
-        }
-    }
-    return closest;
-}
-
-template<typename T, typename matrix_t>
-int constructMatrix(int n, float cond, int space, bool geom, matrix_t& A, int p, float& true_cond) {
-   
-
-    std::vector<float> fileNames = getFileNames("/root/home/Precimonious/GMRES_IR/tempscripts/matrix_collection_" + std::to_string(p), true_cond);
-    true_cond = find_closest(fileNames, cond);
-    std::string fileName = "/root/home/Precimonious/GMRES_IR/tempscripts/matrix_collection_" + std::to_string(p) + "/" + "matrix_" + std::to_string(static_cast<int>(true_cond)) + ".csv";
-    std::ifstream file(fileName);
-    if (!file.is_open()) {
-        std::cerr << "File not found" << std::endl;
-        return 1;
-    }
-    std::string line;
-    int i = 0;
-    while (std::getline(file, line)) {
-        std::stringstream ss(line);
-        std::string token;
-        int j = 0;
-        while (std::getline(ss, token, ',')) {
-            if(j == n && i == n) break;
-            else {
-            A(i, j) = std::stod(token);
-            j++;
-            if(j == n) {i++; j = 0;}
-            }
-        }
-    }
-    std::cout << "true_cond is : " <<  true_cond << std::endl;
-    return 0;
-
-}
-
-#endif
-
-
-
 std::ofstream myfile("e5m2_error_f_cond.csv");
 std::ofstream timefile("time.txt");
+
+
+
+
+
+
+
 //each T_2 is the precision in which first iter of GMRES-IR will take place, T3 is the initial solution precision
 template <typename F0, typename F1, typename T2, typename T3, typename T4, typename T5, typename T6>
-double GMRES_IR(size_t n, double scale, float cond, factorization_type fact_type, double switching_val, double tolerance, int p,  int variant = 0, int num_iter_1 = 0, int num_total_iter = 5, kernel_type precond_mode = kernel_type::RIGHT_LU, int max_gmres_iter = 20, int inner_num_gmres_iter = 20, int num_IR_iter=20, refinement_type method = refinement_type::GMRES_IR, int block_size=128, int stopping_pos=99999) 
+double GMRES_IR(size_t n, double scale, float cond, factorization_type fact_type, double switching_val, double tolerance, bool is_symmetric, int p,  int variant = 0, int num_iter_1 = 0, int num_total_iter = 5, kernel_type precond_mode = kernel_type::RIGHT_LU, int max_gmres_iter = 20, int inner_num_gmres_iter = 20, int num_IR_iter=20, refinement_type method = refinement_type::GMRES_IR, int block_size=128, int stopping_pos=99999) 
 {   
     using matrix_t = tlapack::LegacyMatrix<ml_dtypes::float8_ieee_p<4>>;
     using block_mat_t = tlapack::BlockMatrix<ml_dtypes::float8_ieee_p<4>>;
@@ -339,21 +84,8 @@ double GMRES_IR(size_t n, double scale, float cond, factorization_type fact_type
     using range = pair<idx_t, idx_t>;
 
 
-    //struct to count flops for plotting
-    // flops  = {0,0,0,0,0};
- 
-    // assert(flops.n_flops_bfloat == 0);
-    // assert(flops.n_flops_double == 0);
-    // assert(flops.n_flops_float == 0);
-    // assert(flops.n_flops_half == 0);
-    // assert(flops.n_flops_fp8 == 0);
-
-
     double d_conv_bound = sqrt(static_cast<double>(n)) * std::pow(2, -53);
     double s_conv_bound = sqrt(static_cast<double>(n)) * std::pow(2, -24);   
-
-    // Functors for creating new matrices
-    tlapack::Create<matrix_t> new_matrix;
 
     // Create the n-by-n matrix A in precision float
     std::vector<float> A_(n * n);
@@ -388,11 +120,12 @@ double GMRES_IR(size_t n, double scale, float cond, factorization_type fact_type
 
     float true_cond;
     //construct the matrix in desired precision
-    constructMatrix<float>(n, cond, std::ceil(cond/static_cast<float>(5)) > n-1 ? n-1 : std::ceil(cond/static_cast<float>(5)) , false, FG, p, true_cond);
+    constructMatrix<float>(n, cond, std::ceil(cond/static_cast<float>(5)) > n-1 ? n-1 : std::ceil(cond/static_cast<float>(5)) , false, FG, p, is_symmetric, true_cond);
    
-   if(n==8) printMatrix(FG);
-   if(n==10) printPowerof2Matrix(FG);
-    std::cout << "Matrix has entries between +1 and -1 : " << check_matrix(FG) << std::endl;
+    
+
+
+
     std::vector<float> S_scal(n, 0.0);
     for (size_t i = 0; i < n; i++){
         S_scal[i] = 1.0;
@@ -402,29 +135,6 @@ double GMRES_IR(size_t n, double scale, float cond, factorization_type fact_type
         R_scal[i] = 1.0;
     }
 
-    // float maxR, maxS;
-   
-    //     for(int i = 0; i < n; i++){
-    //         auto c1 = tlapack::rows(FG,range(i,i+1));
-    //         R_scal[i] = 1/closest_power_of_two((tlapack::lange(tlapack::Norm::Inf, c1)));
-    //          R_scal[i] = 1.0;
-
-    //     }
-    //     for(int j = 0; j < n; j++){
-    //         for(int k = 0; k < n; k++){
-    //             FG_d(j,k) = FG(j,k)*(R_scal[j]);
-    //         }
-    //     }
-    //       for(int i = 0; i < n; i++){
-    //         auto c1 = tlapack::cols(FG,range(i,i+1));
-    //         S_scal[i] = 1/closest_power_of_two((tlapack::lange(tlapack::Norm::Inf, c1)));
-    //          S_scal[i] = 1.0;
-    //     }
-    //     for(int j = 0; j < n; j++){
-    //         for(int k = 0; k < n; k++){
-    //             FG_d(k,j) = FG(k,j)*(S_scal[j]);
-    //         }
-    //     }
         
 
     //     //next we need to scale by a parameter theta
@@ -650,6 +360,7 @@ double GMRES_IR(size_t n, double scale, float cond, factorization_type fact_type
    
     //declare arrays for piv
     std::vector<size_t> piv_lo(n);
+    std::vector<size_t> piv_lo2(n);
     std::vector<size_t> piv_hi(n);
 
 
@@ -659,6 +370,7 @@ double GMRES_IR(size_t n, double scale, float cond, factorization_type fact_type
   
     // if(variant == 0) info = tlapack::getrf(LU, piv_lo, tlapack::GetrfOpts{GetrfVariant::Recursive});
     // else info = tlapack::getrf(LU, piv_lo, tlapack::GetrfOpts{GetrfVariant::Level0});
+    
     if(fact_type == factorization_type::two_prec_LU)
         info = getrf_mixed_blocked<F0, F1>(LU, piv_lo, block_size, switching_val);
     else if(fact_type == factorization_type::standard_LU)
@@ -666,14 +378,7 @@ double GMRES_IR(size_t n, double scale, float cond, factorization_type fact_type
     else if(fact_type == factorization_type::scaled_two_prec_store_LU) {
         info = getrf_block_low_prec<F0, F1>(LU, piv_lo, block_size, tolerance);
     }
-    std::cout << "================================" << std::endl;
-
-    std::cout << "total number of blocks = " << n/block_size << std::endl;
-    std::cout << "number of blocks of U rounded to 8 : " << numU_to8 << std::endl;
-    std::cout << "number of blocks of L rounded to 8 : " << numL_to8 << std::endl;
-
-    //info = getrf(LU, piv_lo, flops);
-    std::cout << "LU factorization done" << std::endl;
+    
 
     if (info != 0) {
         std::cerr << "Matrix could not be factorized :(" << std::endl;
@@ -682,19 +387,11 @@ double GMRES_IR(size_t n, double scale, float cond, factorization_type fact_type
     
     int infotoo2 = tlapack::getrf(LU_double, piv_hi, tlapack::GetrfOpts{GetrfVariant::Level0});
     if (infotoo2 != 0) {
-        std::cerr << "Matrix could not be factorized in fp64 :(" << std::endl;
+        std::cerr << "Matrix is singular" << std::endl;
         return -1;
     }
 
     std::cout << " factorization in double complete" << std::endl;
-    if(n==8) {printMatrix(LU_double); std::cout << "----------" << std::endl; printMatrix(LU);}
-    
-    // #undef USE_LEGACY
-
-    // PrintAllExp(LU_double, Layout::ColMajor);
-    // PrintAllExp(LU_double, Layout::RowMajor);
-
-    // //compute sol in double
 
     for (idx_t i = 0; i < n;i++){
         if (piv_hi[i] != i) {
@@ -883,10 +580,10 @@ double GMRES_IR(size_t n, double scale, float cond, factorization_type fact_type
         } else if(precond_mode == kernel_type::SPLIT_LU) {
             GMRES(A_F, Q, H, LU_copy, piv_lo, r_f, solved_r_f, xx_f, cs, sn, kernel_type::SPLIT_LU, max_gmres_iter, num_iter_1);
         } else if(precond_mode == kernel_type::NONE) {
-            std::cout << "running gmres with no preconditioner" << std::endl;
+            std::cout << "running gmres with left preconditioner" << std::endl;
             carson_GMRES(A_F, Q, H, LU_copy, piv_lo, r_f, solved_r_f, xx_f, cs, sn, kernel_type::NONE, max_gmres_iter, num_iter_1);
         }
-        for(int i = 0; i < n; i++) x[i] = x[i] + static_cast<double>(xx_f[i])/scale;
+        for(int i = 0; i < n; i++) x[i] = x[i] + static_cast<double>(xx_f[i]);
         //flops.add_double_flops(n);
         count++;
         
@@ -1100,7 +797,7 @@ double GMRES_IR(size_t n, double scale, float cond, factorization_type fact_type
 
 
 
-int set_matrix_params(int& n, float& cond, nlohmann::json& outer_settings)
+int set_matrix_params(int& n, float& cond, bool& is_symmetric, nlohmann::json& outer_settings)
 {
 
     string tmp;
@@ -1112,6 +809,10 @@ int set_matrix_params(int& n, float& cond, nlohmann::json& outer_settings)
     tmp = settings["condition number"].dump();
     tmp = tmp.substr(1, tmp.size() - 2);
     cond = stof(tmp);
+
+    tmp = settings["symmetric"].dump();
+    tmp = tmp.substr(1, tmp.size() - 2);
+    is_symmetric = (tmp == "true");
 
     return 0;
 
@@ -1237,16 +938,11 @@ int set_refinement_settings(int& max_gmres_iter, int& num_iter_1, int& total_num
 
 
 int main(int argc, char** argv) {
-    typedef ml_dtypes::float8_e4m3fn float8e4m3fn;
-    typedef ml_dtypes::float8_e5m2 float8e5m2;
-    typedef ml_dtypes::float8_ieee_p<4> floate4m3;
-    typedef ml_dtypes::float8_ieee_p<3> floate5m2;
-    typedef ml_dtypes::block_float8_ieee<4> bfp;
-    typedef Eigen::bfloat16 bfloat16;
-    typedef Eigen::half half;
+
     //matrix params
     int n;
     float cond;
+    bool is_symmetric;
 
     //fact params
     int block_size, stopping_pos;
@@ -1277,7 +973,7 @@ int main(int argc, char** argv) {
    
     //set  arguments from settings.json
     std::cout << "setting program vars from JSON" << std::endl;
-    set_matrix_params(n, cond, settings);
+    set_matrix_params(n, cond, is_symmetric, settings);
     std::cout << "set matrix params" << std::endl;
     set_factorization_params(fact_type, lowest_prec, highest_prec, is_rank_revealing, pivot_scheme, num_precisions, block_size, use_microscal, stopping_pos, switching_val, scaling_factor, tolerance, settings);
     std::cout << "set factorization params" << std::endl;
@@ -1285,7 +981,7 @@ int main(int argc, char** argv) {
     std::cout << "set refinement params" << std::endl;
 
     std::cout << "beginning factorization" << std::endl;
-    er3 += GMRES_IR<ml_dtypes::float8_ieee_p<5>, Eigen::half, float, double, double, double, double>(n, scaling_factor, static_cast<float>(cond), fact_type, switching_val, tolerance,  999, 0, num_iter_1, total_num_iter, precond_kernel, max_gmres_iter, inner_gmres_num, num_IR_iter, refinement_method, block_size, stopping_pos);    
+    er3 += GMRES_IR<ml_dtypes::float8_ieee_p<6>,Eigen::half, double, double, double, double, double>(n, scaling_factor, static_cast<float>(cond), fact_type, switching_val, tolerance, is_symmetric, 999, 0, num_iter_1, total_num_iter, precond_kernel, max_gmres_iter, inner_gmres_num, num_IR_iter, refinement_method, block_size, stopping_pos);    
     
     
     bool verified = abs(er3) < 1e-8;

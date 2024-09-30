@@ -83,7 +83,7 @@ def cond_estim(A):
 
 
 
-def init_matrix(dim1, dim2, cond, is_geom, lst):
+def init_matrix(dim1, dim2, cond, is_geom,is_symmetric, lst):
     #this function generates a matrix of given condition number in float32 using SVD.
     #We then round that matrix down to fp8
 
@@ -97,7 +97,11 @@ def init_matrix(dim1, dim2, cond, is_geom, lst):
         for i in range(dim):
             sigma[i,i] = np.power(cond,float(-i)/float(dim - 1))  
     U = random_orthog(dim1)
-    V = random_orthog(dim2)
+    if not is_symmetric :
+        print("normal matrix")
+        V = np.transpose(U)
+    else :
+        V = random_orthog(dim2)
     A = np.matmul(np.matmul(U,sigma),V)
     m,n = np.shape(A)
     for i in range(m):
@@ -191,11 +195,12 @@ def vanilla_LU_gen(A, n, m,cond, new_val):
     A[m-1,n-1] = last
     return [to_ret, new_val - last]
 
-def LU_gen(n1,cond,m, mode, p):
+def LU_gen(n1,cond,m, mode, p, is_symmetric):
     #m is dimension of trailing submatrix that we will optimize on
+    random.seed(10)
     if p == 999:
-        A = init_matrix(n1, n1, cond, mode, [1.0])
-        A = A
+        A = init_matrix(n1, n1, cond, mode, is_symmetric ,[1.0])
+        A = 20.0*A
         to_ret = A.flatten('F').tolist()[0]
         to_ret.append(np.linalg.cond(A))
         return to_ret
@@ -229,6 +234,7 @@ def LU_gen(n1,cond,m, mode, p):
 
 def main():
     A = init_matrix(1000, 1000, 10**5, False, [1.0])
+
     P, L, U = sc.linalg.lu(A)
     L = np.abs(L)
     U = np.abs(U)

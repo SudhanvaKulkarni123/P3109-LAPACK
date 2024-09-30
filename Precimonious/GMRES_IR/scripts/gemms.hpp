@@ -74,7 +74,7 @@ void block_gemm(matrixA_t& A, matrixA_t& B, matrixA_t& C, matrixB_t& A_dtype, ma
         {
             if (int(floor(log2(abs(A(i, j))))) > max_exp) max_exp = int(floor(log2(abs(A(i, j)))));
         }
-        max_exp_A1[i] = max_exp;
+        max_exp_A1[i] = 0;
         } else {
             max_exp_A1[i] = 0;
         }
@@ -90,7 +90,7 @@ void block_gemm(matrixA_t& A, matrixA_t& B, matrixA_t& C, matrixB_t& A_dtype, ma
         {
             if (int(floor(log2(abs(B(i, j))))) > max_exp) max_exp = int(floor(log2(abs(B(i, j)))));
         }
-        max_exp_B1[j] = max_exp;
+        max_exp_B1[j] = 0;
         } else {
             max_exp_B1[j] = 0;
         }

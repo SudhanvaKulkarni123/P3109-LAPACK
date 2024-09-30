@@ -149,7 +149,7 @@ int getrf_blocked(matrix_t& A, piv_t& piv, int r=256, int stopping_point = 99999
             auto buf_L = gemm_2_matrix(buf_L_, n - (k+1)*r, r);
             std::vector<gemm_type> buf_U_(r * (n - (k+1)*r));
             auto buf_U = gemm_2_matrix(buf_U_, r, n - (k+1)*r);
-            squeezing_matmul(A10, A01, A11, buf_L, buf_U, 1.0, 1.9375);
+            block_gemm(A10, A01, A11, buf_L, buf_U);
         
             
             
@@ -269,16 +269,17 @@ int getrf_mixed_blocked(matrix_t& A, piv_t& piv, int r=256, float switching_rati
             auto buf_L = gemm_2_matrix(buf_L_, n - (k+1)*r, r);
             std::vector<gemm_type_2> buf_U_(r * (n - (k+1)*r));
             auto buf_U = gemm_2_matrix(buf_U_, r, n - (k+1)*r);
-            block_gemm(A10, A01, A11, buf_L, buf_U);
-            std::cout << "using second gemm type" << std::endl;
+            //block_gemm(A10, A01, A11, buf_L, buf_U);
+            squeezing_matmul(A10, A01, A11, buf_L, buf_U, -1.0, 1.0);
+            std::cout << "using second gemm type" << typeid(gemm_type_2).name() <<  std::endl;
         } else {
             std::vector<gemm_type> buf_L_(r * (n - (k+1)*r));
             auto buf_L = gemm_matrix(buf_L_, n - (k+1)*r, r);
             std::vector<gemm_type> buf_U_(r * (n - (k+1)*r));
             auto buf_U = gemm_matrix(buf_U_, r, n - (k+1)*r);
-            block_gemm(A10, A01, A11, buf_L, buf_U);
-            //squeezing_matmul(A10, A01, A11, buf_L, buf_U, 1.0, 1.9375);
-            std::cout << "using first gemm type" << std::endl;
+            //block_gemm(A10, A01, A11, buf_L, buf_U);
+            squeezing_matmul(A10, A01, A11, buf_L, buf_U, -1.0, 1.0);
+            std::cout << "using first gemm type" << typeid(gemm_type).name() << std::endl;
 
         }
         if(nrmA11/nrmA >= switching_ratio/1.5 && nrmA11/nrmA <= switching_ratio*1.5 && !button) button = true;

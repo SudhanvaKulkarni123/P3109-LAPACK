@@ -137,7 +137,7 @@ double inf_norm(vector_t &v)
 
 /// solution is returned in b
 template <typename matrix_t, typename vector_t, typename idk>
-void LU_solve(matrix_t &LU, std::vector<idk> &piv, vector_t &b)
+void LU_solve(matrix_t &LU, std::vector<idk> &piv, vector_t &b, bool is_symmetric = false)
 {
     // data traits
     using idx_t = size_type<matrix_t>;
@@ -155,9 +155,15 @@ void LU_solve(matrix_t &LU, std::vector<idk> &piv, vector_t &b)
             b[i] = tmp;
         }
     }
+    if(is_symmetric) {
+        tlapack::trsv(Uplo::Lower, tlapack::NO_TRANS, Diag::NonUnit, LU, b);
+        tlapack::trsv(Uplo::Lower, tlapack::TRANSPOSE, Diag::NonUnit, LU, b);
 
-    tlapack::trsv(Uplo::Lower, tlapack::NO_TRANS, Diag::Unit, LU, b);
-    tlapack::trsv(Uplo::Upper, tlapack::NO_TRANS, Diag::NonUnit, LU, b);
+    } else {
+        tlapack::trsv(Uplo::Lower, tlapack::NO_TRANS, Diag::Unit, LU, b);
+        tlapack::trsv(Uplo::Upper, tlapack::NO_TRANS, Diag::NonUnit, LU, b);
+    }
+    
     return;
 }
 
@@ -269,7 +275,6 @@ void arnoldi_iter(matrixA_t &A, matrixH_t &H, matrixQ_t &Q, matrixLU_t LU, std::
         auto vec_tmp = tlapack::col(Q_tmp, k);
         gemv(Op::NoTrans, static_cast<prod_type>(1.0), A_tmp, vec_tmp, static_cast<prod_type>(0), w1);
         // need to permute before applying LU
-        if(ker == kernel_type::LEFT_LU) {
         for (int i = 0; i < n; i++)
         {
             if (piv[i] != i)
@@ -281,7 +286,7 @@ void arnoldi_iter(matrixA_t &A, matrixH_t &H, matrixQ_t &Q, matrixLU_t LU, std::
         }
         tlapack::trsv(Uplo::Lower, NO_TRANS, Diag::Unit, LU, w1);
         tlapack::trsv(Uplo::Upper, NO_TRANS, Diag::NonUnit, LU, w1);
-        }
+        
 
         for (int i = 0; i < n; i++)
             w[i] = static_cast<scalar_t>(w1[i]);
@@ -345,7 +350,7 @@ void arnoldi_iter(matrixA_t &A, matrixH_t &H, matrixQ_t &Q, matrixLU_t LU, std::
     }
 
     // H[j,0:j+1] = V[0:n] * w
-    for (idx_t i = 0; i <= k; i++) {
+    for (idx_t i = 0; i <= k+1; i++) {
         H(i, k) = dot(tlapack::col(Q, i), w);     // 2n
         axpy(-H(i, k), tlapack::col(Q, i), w);    // 2n
     }
@@ -451,18 +456,18 @@ void GMRES(matrixA_t& A, matrixQ_t& Q, matrixH_t& H, matrixLU_t& LU, std::vector
             tlapack::gemv(tlapack::NO_TRANS, static_cast<scalar_t>(1.0), tlapack::slice(Q, range{0, n}, range{0,i}), da_tmp, static_cast<scalar_t>(0.0), x);
             //flops.add_double_flops(2*n*(i-1));
             break;}
-        //if(abs(static_cast<double>(be_1[i])/static_cast<double>(norm_r)) <= 0.125*prev_err){ FGMRES_log << "Did not make satisfactory progress and broke out at iteration : " << i << std::endl; break;}
+        if(abs(static_cast<double>(be_1[i])/static_cast<double>(norm_r)) <= 0.125*prev_err){ FGMRES_log << "Did not make satisfactory progress and broke out at iteration : " << i << std::endl; break;}
         prev_err = abs(static_cast<double>(be_1[i])/static_cast<double>(norm_r));
         //flops.add_double_flops(1);
 
     }
 
-    // auto da_tmp = tlapack::slice(be_1,range{0, i});
+    auto da_tmp = tlapack::slice(be_1,range{0, i});
 
-    //         tlapack::trsv(Uplo::Upper, tlapack::NO_TRANS,tlapack::Diag::NonUnit ,tlapack::slice(H,range{0, i}, range{0,i}), da_tmp);
+    tlapack::trsv(Uplo::Upper, tlapack::NO_TRANS,tlapack::Diag::NonUnit ,tlapack::slice(H,range{0, i}, range{0,i}), da_tmp);
 
-    //         //flops.add_double_flops(2*(i-1)*(i-1));
-    //         tlapack::gemv(tlapack::NO_TRANS, static_cast<scalar_t>(1.0), tlapack::slice(Q, range{0, n}, range{0,i}), da_tmp, static_cast<scalar_t>(0.0), x);
+    //flops.add_double_flops(2*(i-1)*(i-1));
+    tlapack::gemv(tlapack::NO_TRANS, static_cast<scalar_t>(1.0), tlapack::slice(Q, range{0, n}, range{0,i}), da_tmp, static_cast<scalar_t>(0.0), x);
     
 
 
@@ -487,7 +492,7 @@ void GMRES(matrixA_t& A, matrixQ_t& Q, matrixH_t& H, matrixLU_t& LU, std::vector
 }
 
 template <typename matrixA_t, typename matrixQ_t, typename matrixH_t, typename matrixLU_t, typename vector_t, typename aux_vector_t, typename idk>
-void carson_GMRES(matrixA_t& A, matrixQ_t& Q, matrixH_t& H, matrixLU_t& LU, std::vector<idk>& piv, vector_t& b, vector_t& x0, vector_t& x, aux_vector_t& cs, aux_vector_t& sn, kernel_type ker, int m, int max_num_iter, double tol = 1e-12)
+void carson_GMRES(matrixA_t& A, matrixQ_t& Q, matrixH_t& H, matrixLU_t& LU, std::vector<idk>& piv, vector_t& b, vector_t& x0, vector_t& x, aux_vector_t& cs, aux_vector_t& sn, kernel_type ker, int m, int max_num_iter, double tol = 1e-6)
 {
     using idx_t = size_type<matrixA_t>;
     using scalar_t = type_t<matrixH_t>;
@@ -501,9 +506,13 @@ void carson_GMRES(matrixA_t& A, matrixQ_t& Q, matrixH_t& H, matrixLU_t& LU, std:
         }
     }
 
+    LU_solve(LU, piv, b);
+
     auto nrmb = tlapack::nrm2(b);
 
     std::cout << "norm b is : " << nrmb << std::endl;
+
+    cout << "U(n,n) is : " << LU(n-1, n-1) << endl;
 
     std::vector<scalar_t> be_1(n);
     std::vector<scalar_t> w(n);
@@ -513,12 +522,25 @@ void carson_GMRES(matrixA_t& A, matrixQ_t& Q, matrixH_t& H, matrixLU_t& LU, std:
         else be_1[i] = 0.0;
     }
     int num_iter = 0;
+    double prev_err = 9999999.0;
 
     for(i = 0; i < n-1; i++)
     {
         num_iter++;
         auto vcur = tlapack::col(Q, i);
         tlapack::gemv(tlapack::NO_TRANS, static_cast<scalar_t>(1.0), A, vcur, static_cast<scalar_t>(0.0), w);
+        // need to permute before applying LU
+        for (int f = 0; f < n; f++)
+        {
+            if (piv[f] != f)
+            {
+                auto tmp = w[piv[f]];
+                w[piv[f]] = w[f];
+                w[f] = tmp;
+            }
+        }
+        tlapack::trsv(Uplo::Lower, NO_TRANS, Diag::Unit, LU, w);
+        tlapack::trsv(Uplo::Upper, NO_TRANS, Diag::NonUnit, LU, w);
 
         for(int k = 0; k <= i; k++) {
             H(k, i) = tlapack::dot(tlapack::col(Q, k), w);
@@ -541,6 +563,8 @@ void carson_GMRES(matrixA_t& A, matrixQ_t& Q, matrixH_t& H, matrixLU_t& LU, std:
         H(i+1,i) = 0.0;
 
         
+
+        
         if(i == n-1 || abs(be_1[i+1])/nrmb <= tol) {
             std::cout << "converged and broke out at iteration : " << i << std::endl;
             auto tmp = tlapack::slice(be_1, range{0, i});
@@ -548,6 +572,12 @@ void carson_GMRES(matrixA_t& A, matrixQ_t& Q, matrixH_t& H, matrixLU_t& LU, std:
             tlapack::gemv(tlapack::NO_TRANS, 1.0, tlapack::slice(Q, range{0, n}, range{0, i}), tmp, 0.0, x);
             break;
         } 
+       
+
+        if(abs(static_cast<double>(be_1[i+1])/static_cast<double>(nrmb)) >= prev_err){ cout << "Did not make satisfactory progress and broke out at iteration : " << i << std::endl; break;}
+
+
+        prev_err = abs(be_1[i+1])/nrmb;
 
 
     }
