@@ -97,7 +97,7 @@ def init_matrix(dim1, dim2, cond, is_geom,is_symmetric, lst):
         for i in range(dim):
             sigma[i,i] = np.power(cond,float(-i)/float(dim - 1))  
     U = random_orthog(dim1)
-    if not is_symmetric :
+    if is_symmetric :
         print("normal matrix")
         V = np.transpose(U)
     else :
@@ -169,6 +169,8 @@ def tunneling_step(X,T,gamma, lowest, iter, cond, is_LU, m, lst):
 
 def annealing_step():
     return
+
+
 def cond_annealing(n, cond, p):
 
     a_values = set_vals(p)

@@ -6,6 +6,7 @@ enum class refinement_type
 {
     GMRES_IR,
     NVIDIA_IR,
+    CG_IR,
     NO_IR,
 };
 enum class kernel_type
@@ -492,7 +493,7 @@ void GMRES(matrixA_t& A, matrixQ_t& Q, matrixH_t& H, matrixLU_t& LU, std::vector
 }
 
 template <typename matrixA_t, typename matrixQ_t, typename matrixH_t, typename matrixLU_t, typename vector_t, typename aux_vector_t, typename idk>
-void carson_GMRES(matrixA_t& A, matrixQ_t& Q, matrixH_t& H, matrixLU_t& LU, std::vector<idk>& piv, vector_t& b, vector_t& x0, vector_t& x, aux_vector_t& cs, aux_vector_t& sn, kernel_type ker, int m, int max_num_iter, double tol = 1e-6)
+void carson_GMRES(matrixA_t& A, matrixQ_t& Q, matrixH_t& H, matrixLU_t& LU, std::vector<idk>& piv, vector_t& b, vector_t& x0, vector_t& x, aux_vector_t& cs, aux_vector_t& sn, kernel_type ker, int m, int max_num_iter, double tol = 1e-12)
 {
     using idx_t = size_type<matrixA_t>;
     using scalar_t = type_t<matrixH_t>;
