@@ -2,7 +2,7 @@ CXXFLAGS = -std=c++20
 CXX = clang++
 
 CDBG += -w
-CXXFLAGS += $(CDBG)
+CXXFLAGS += $(CDBG) 
 
 
 SOURCES = GMRES_IR.cpp 
@@ -12,11 +12,11 @@ INCLUDE_PATH += -I$(HOME)/Documents/Precimonious-Clang-Plugins/TLAPACK-Precimoni
 
 
 
-PYTHON_LIBS := $(shell python3-config --libs)
-PYTHON_INCLUDE_DIRS := $(shell python3-config --includes)
+PYTHON_LIBS := $(shell python3.11-config --libs)
+PYTHON_INCLUDE_DIRS := $(shell python3.11-config --includes)
 
-PY_CFLAGS  := $(shell python3-config --cflags)
-PY_LDFLAGS := $(shell python3-config --ldflags)
+PY_CFLAGS  := $(shell python3.11-config --cflags)
+PY_LDFLAGS := $(shell python3.11-config --ldflags)
 
 
 GMRES:

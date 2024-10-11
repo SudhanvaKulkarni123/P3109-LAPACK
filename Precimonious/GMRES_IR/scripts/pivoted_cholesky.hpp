@@ -53,10 +53,15 @@ int cholesky_kernel(matrix_t& A)
         tmp -= A(i,k) * A(i,k); 
         if(i == 2) cout << tmp << endl; 
     }
-    if (tmp <= 0) {
-        cout << " messed up at index i = " << i << "with tmp = " << tmp << "\n";
-        throw std::runtime_error("Matrix is not positive definite");
-    }
+    // if (tmp <= 0) {
+    //     cout << "Matrix is not positive definite, perturbing diagonal to restore positveness\n";
+    //     tmp += 0.0625;
+    //     cout << "tmp after prturbation : " << tmp << "\n";
+    // }
+    
+        
+
+    
 
     A(i,i) = sqrt(tmp);  
 
@@ -67,7 +72,6 @@ int cholesky_kernel(matrix_t& A)
         }
         A(j,i) = tmp / A(i,i);  
     }
-
 
 
 }
@@ -133,7 +137,7 @@ public:
 
 
 template<TLAPACK_MATRIX matrix_t, TLAPACK_VECTOR piv_t>
-int pivoted_cholesky(matrix_t& A, piv_t& left_piv, piv_t& right_piv, int r = 32, double tol = 0.0000000000001)
+int pivoted_cholesky(matrix_t& A, piv_t& left_piv, piv_t& right_piv, n_flops& flop_counter,  int r = 32, double tol = 0.0000000000001)
 {
     using idx_t = size_type<matrix_t>;
     using T = type_t<matrix_t>;
@@ -143,7 +147,7 @@ int pivoted_cholesky(matrix_t& A, piv_t& left_piv, piv_t& right_piv, int r = 32,
 
     using gemm_type = float;
     using gemm_type2 =  Eigen::half;
-    using gemm_type3 = ml_dtypes::float8_ieee_p<4>;
+    using gemm_type3 = ml_dtypes::float8_ieee_p<6>;
 
 
 
@@ -189,6 +193,9 @@ int pivoted_cholesky(matrix_t& A, piv_t& left_piv, piv_t& right_piv, int r = 32,
     }
 
     if (sorted) cout << " array is sorted!";
+    cout << "min diag elem = " << A(n-1, n-1) << " , max diag elem = " << A(0,0) << "\n";
+    cout << "ration of indices is : " << A(0,0)/A(n-1, n-1) << endl;
+    
     // cout << "after sorted diag : \n";
    
 
@@ -200,6 +207,7 @@ int pivoted_cholesky(matrix_t& A, piv_t& left_piv, piv_t& right_piv, int r = 32,
          
 
         cholesky_kernel(A00);
+        flop_counter.add_float_flops(r*r*r/3);
         
 
         cout << "\n";
@@ -212,10 +220,12 @@ int pivoted_cholesky(matrix_t& A, piv_t& left_piv, piv_t& right_piv, int r = 32,
     
 
         tlapack::trsm(tlapack::LEFT_SIDE, Uplo::Lower, tlapack::NO_TRANS, tlapack::Diag::NonUnit, 1.0, A00, A01);
+        flop_counter.add_float_flops(r*r*r*(q - i - 1));
 
 
         //check the value of err and perform gemm update
-        double err_bnd = tol/A(i*r,i*r);
+        double err_bnd = tol/diag_A[i*r];
+        flop_counter.add_double_flops(1);
         auto A10 = tlapack::slice(A,  range((i+1)*r, n) ,range(i*r, (i+1)*r));
         for(int s = 0; s < nrows(A10); s++) {
             for(int t = 0; t < ncols(A10); t++) {
@@ -231,6 +241,8 @@ int pivoted_cholesky(matrix_t& A, piv_t& left_piv, piv_t& right_piv, int r = 32,
             std::vector<gemm_type3> buf_U_(r * (n - (i+1)*r));
             auto buf_U = gemm_3_matrix(buf_U_, r, n - (i+1)*r);
             squeezing_matmul(A10, A01, A11, buf_L, buf_U, -1.0, 1.0);
+            //block_gemm(A10, A01, A11, buf_L, buf_U);
+            flop_counter.add_fp8_flops(2*r*(n - (i+1)*r)*(n - (i+1)*r));
         } else if(err_bnd > (2.0*pow(2.0, -11) + pow(2.0, -22))/(1.0 - 2.0*pow(2.0, -11) - pow(2.0, -22))) {
             cout << " using middle precision \n"; 
             std::vector<gemm_type2> buf_L_(r * (n - (i+1)*r));
@@ -238,6 +250,7 @@ int pivoted_cholesky(matrix_t& A, piv_t& left_piv, piv_t& right_piv, int r = 32,
             std::vector<gemm_type2> buf_U_(r * (n - (i+1)*r));
             auto buf_U = gemm_2_matrix(buf_U_, r, n - (i+1)*r);
             block_gemm(A10, A01, A11, buf_L, buf_U);
+            flop_counter.add_half_flops(2*r*(n - (i+1)*r)*(n - (i+1)*r));
         } else {
             cout << " using highest precision \n"; 
             std::vector<gemm_type> buf_L_(r * (n - (i+1)*r));
@@ -245,6 +258,7 @@ int pivoted_cholesky(matrix_t& A, piv_t& left_piv, piv_t& right_piv, int r = 32,
             std::vector<gemm_type> buf_U_(r * (n - (i+1)*r));
             auto buf_U = gemm_matrix(buf_U_, r, n - (i+1)*r);
             block_gemm(A10, A01, A11, buf_L, buf_U);
+            flop_counter.add_float_flops(2*r*(n - (i+1)*r)*(n - (i+1)*r));
 
         }
 

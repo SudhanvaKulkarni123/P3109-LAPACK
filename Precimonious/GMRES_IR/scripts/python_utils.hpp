@@ -14,7 +14,7 @@ std::vector<T> convertPythonListToVector(std::vector<T>& vec,PyObject* pyList) {
 }
 
 template<typename T, typename matrix_t>
-int constructMatrix(int n, float cond, int space, bool geom, matrix_t& A, int p, bool is_symmetric, float& true_cond) {
+int constructMatrix(int n, float cond, int space, bool geom, matrix_t& A, int p, bool is_symmetric, bool is_diag_dom, float& true_cond) {
     //this is an ambitious function that uses a Python embedding to call the functions found in generate\ copy.py to fill in the entries of A
     
     PyObject *pName, *pModule, *pFunc;
@@ -29,8 +29,8 @@ int constructMatrix(int n, float cond, int space, bool geom, matrix_t& A, int p,
         pFunc = PyObject_GetAttrString(pModule, (char *)"LU_gen");
 
         if (pFunc && PyCallable_Check(pFunc)) {
-            pArgs = PyTuple_New(6);
-            for (i = 0; i < 6; ++i) {
+            pArgs = PyTuple_New(7);
+            for (i = 0; i < 7; ++i) {
                 switch(i) {
                     case 0:
                         pValue = PyLong_FromLong(n);
@@ -46,6 +46,9 @@ int constructMatrix(int n, float cond, int space, bool geom, matrix_t& A, int p,
                         break;
                     case 4:
                         pValue = PyLong_FromLong(p);
+                        break;
+                    case 6:
+                        pValue = is_diag_dom ? Py_True : Py_False;
                         break;
                     default :
                         pValue = is_symmetric ? Py_True : Py_False;
@@ -76,7 +79,6 @@ int constructMatrix(int n, float cond, int space, bool geom, matrix_t& A, int p,
                 // tlapack::LegacyMatrix<T, int> LU(n, n, b.data(), n);
                 // printMatrix(LU);
                 true_cond = PyFloat_AsDouble(PyList_GetItem(pValue, n*n));
-                std::cout << true_cond << std::endl;
                 Py_DECREF(pValue);
             }
             else {

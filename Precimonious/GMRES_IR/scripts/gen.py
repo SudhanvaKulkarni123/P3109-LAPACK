@@ -83,9 +83,23 @@ def cond_estim(A):
 
 
 
-def init_matrix(dim1, dim2, cond, is_geom,is_symmetric, lst):
+def init_matrix(dim1, dim2, cond, is_geom,is_symmetric, is_diag_dom, lst):
     #this function generates a matrix of given condition number in float32 using SVD.
     #We then round that matrix down to fp8
+
+    
+    if is_diag_dom :
+        A = np.random.rand(dim1, dim2)
+        m = dim1
+        n= dim2
+        
+        for i in range(m) : 
+            new_val = abs(A[i,i])
+            for j in range(n) :
+                new_val = new_val + abs(A[i,j])
+            A[i,i] = new_val
+
+        return A
 
     a_values = lst
     dim = min(dim1,dim2)
@@ -197,14 +211,26 @@ def vanilla_LU_gen(A, n, m,cond, new_val):
     A[m-1,n-1] = last
     return [to_ret, new_val - last]
 
-def LU_gen(n1,cond,m, mode, p, is_symmetric):
+def LU_gen(n1,cond,m, mode, p, is_symmetric, is_diag_dom):
     #m is dimension of trailing submatrix that we will optimize on
     random.seed(10)
     if p == 999:
-        A = init_matrix(n1, n1, cond, mode, is_symmetric ,[1.0])
-        A = 20.0*A
+        A = init_matrix(n1, n1, cond, mode, is_symmetric, is_diag_dom ,[1.0])
+        A = A
         to_ret = A.flatten('F').tolist()[0]
-        to_ret.append(np.linalg.cond(A))
+        if not is_symmetric:
+                print("not symmetric?")
+                
+        else :
+            diag_A = np.diag(A)
+            diag_A = np.sqrt(diag_A)
+            D_inv = np.linalg.inv(np.diag(diag_A))
+            print(D_inv[0,0])
+            print(np.sqrt(1/A[0,0]))
+
+            equilibrated_A = D_inv @ A @ D_inv
+
+            to_ret.append(np.linalg.cond(equilibrated_A))
         return to_ret
     a_values = set_vals(p)
     A_orig = init_matrix(n1, n1, cond, mode, a_values)

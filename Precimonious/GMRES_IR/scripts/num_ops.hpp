@@ -1,6 +1,6 @@
 /// @author Sudhanva Kulkarni
 /// file with utilities to count num_flops, num_casts, num_comparisons, etc
-
+#include <iostream>
 struct n_flops {
     int n_flops_double;
     int n_flops_float;
@@ -58,6 +58,17 @@ public:
 
     int get_fp8_flops() const {
         return n_flops_fp8;
+    }
+
+    void print_stats() {
+        std::cout << "=========================================\n";
+        std::cout << "flop count per data type as follows - \n";
+        std::cout << "number of fp64 flops : " << get_double_flops() << "\n";
+        std::cout << "number of fp32 flops : " << get_float_flops() << "\n";
+        std::cout << "number of fp16 flops : " << get_half_flops() << "\n";
+        std::cout << "number of bfloat flops : " << get_bfloat_flops() << "\n";
+        std::cout << "number of fp8 flops : " << get_fp8_flops() << "\n";
+        std::cout << "=========================================\n";
     }
 };
 

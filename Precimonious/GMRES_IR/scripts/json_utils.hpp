@@ -2,7 +2,7 @@
 enum class factorization_type { standard_LU, two_prec_LU, three_prec_LU, low_prec_store_LU, scaled_two_prec_store_LU, block_low_prec_LU};
 enum class pivoting_scheme { partial, complete, none};
 
-int set_matrix_params(int& n, float& cond, bool& is_symmetric, nlohmann::json& outer_settings)
+int set_matrix_params(int& n, float& cond, bool& is_symmetric, bool& diag_dom, nlohmann::json& outer_settings)
 {
 
     string tmp;
@@ -18,6 +18,12 @@ int set_matrix_params(int& n, float& cond, bool& is_symmetric, nlohmann::json& o
     tmp = settings["symmetric"].dump();
     tmp = tmp.substr(1, tmp.size() - 2);
     is_symmetric = (tmp == "true");
+
+    tmp = settings["diag_dom"].dump();
+    tmp = tmp.substr(1, tmp.size() - 2);
+    diag_dom = (tmp == "true");
+
+    if(diag_dom) cout << "it is true\n";
 
     return 0;
 

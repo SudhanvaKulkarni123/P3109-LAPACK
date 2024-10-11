@@ -1,8 +1,9 @@
 {
     "matrix settings" : {
         "n" : "1024",
-        "condition number" : "1000",
-        "symmetric" : "true"
+        "condition number" : "50",
+        "symmetric" : "true",
+        "diag_dom" : "false"
     },
     "factorization settings" : {
         "factorization method" : "two_prec_LU",
@@ -11,12 +12,12 @@
         "is rank revealing" : "false",
         "pivoting scheme" : "partial", 
         "num_precisions" : "2",
-        "block size" : "64",
+        "block size" : "128",
         "use Microscaling" : "true",
         "stopping pos" : "99999", 
         "switching val" : "0.5",
         "scaling factor" : "1.0",
-        "tolerance" : "0.00000025"
+        "tolerance" : "0.01"
     },
     "GMRES settings" : {
         "max_gmres_iter" : "1024",
@@ -26,7 +27,8 @@
         "precond_kernel"  : "NONE",
         "num_IR_iter" : "10",
         "inner_gmres_num" : "10",
-        "arnoldi_subroutine" : "MGS"
+        "arnoldi_subroutine" : "MGS",
+        "conv_thresh" : "0.00000000000000001"
     }
     
 }
