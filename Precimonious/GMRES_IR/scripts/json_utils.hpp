@@ -29,7 +29,7 @@ int set_matrix_params(int& n, float& cond, bool& is_symmetric, bool& diag_dom, n
 
 }
 
-int set_factorization_params(factorization_type& fact_type, string& lowest_prec, string& highest_prec, bool& is_rank_revealing,  pivoting_scheme& pivoting_scheme, int& num_precisions, int& block_size, bool& use_microscal, int& stopping_pos, double& switching_val, double& scaling_factor, double& tolerance, nlohmann::json& outer_settings) 
+int set_factorization_params(factorization_type& fact_type, string& lowest_prec, string& highest_prec, bool& is_rank_revealing,  pivoting_scheme& pivoting_scheme, int& num_precisions, int& block_size, bool& use_microscal, int& stopping_pos, double& switching_val, double& scaling_factor, double& tolerance, float& dropping_prob, nlohmann::json& outer_settings) 
 {
     string tmp;
     auto settings = outer_settings["factorization settings"];
@@ -91,6 +91,11 @@ int set_factorization_params(factorization_type& fact_type, string& lowest_prec,
     tmp = tmp.substr(1, tmp.size() - 2);
     std::cout << "tolerance is : " << tmp << std::endl;
     tolerance = stof(tmp);
+
+    tmp = settings["dropping_prob"].dump();
+    tmp = tmp.substr(1, tmp.size() - 2);
+    std::cout << "dropping_prob is : " << tmp << std::endl;
+    dropping_prob = stof(tmp);
 
     return 0;
 }

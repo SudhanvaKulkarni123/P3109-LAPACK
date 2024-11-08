@@ -51,7 +51,7 @@ std::ofstream other_file("e5m2_error_e_cond.csv");
 std::ofstream timefile("time.txt");
 
 template <typename F0, typename F1, typename T2, typename T3, typename T4, typename T5, typename T6>
-double CG_IR(int n, double scale, float cond, factorization_type fact_type, double switching_val, double tolerance, double conv_thresh, bool is_symmetric, bool diag_dom, int prec, int variant = 0, int num_iter_1 = 0, int num_total_iter = 5, kernel_type precond_mode = kernel_type::LEFT_LU, int max_CG_iter = 20, int inner_num_gmres_iter = 20, int num_IR_iter = 20, refinement_type method = refinement_type::CG_IR, int block_size = 128, int stopping_pos = 99999)
+double CG_IR(int n, double scale, float cond, factorization_type fact_type, double switching_val, double tolerance, double conv_thresh, bool is_symmetric, bool diag_dom, float dropping_prob, int prec, int variant = 0, int num_iter_1 = 0, int num_total_iter = 5, kernel_type precond_mode = kernel_type::LEFT_LU, int max_CG_iter = 20, int inner_num_gmres_iter = 20, int num_IR_iter = 20, refinement_type method = refinement_type::CG_IR, int block_size = 128, int stopping_pos = 99999)
 {
     using matrix_t = tlapack::LegacyMatrix<ml_dtypes::float8_ieee_p<4>>;
     using block_mat_t = tlapack::BlockMatrix<ml_dtypes::float8_ieee_p<4>>;
@@ -64,6 +64,7 @@ double CG_IR(int n, double scale, float cond, factorization_type fact_type, doub
 
     n_flops mixed_prec_flops; mixed_prec_flops.reset();
     n_flops reg_flops; reg_flops.reset();
+    n_flops mixed_fact_flops;  mixed_fact_flops.reset();
 
     
 
@@ -279,7 +280,7 @@ double CG_IR(int n, double scale, float cond, factorization_type fact_type, doub
 
     //before we copy A to LL, we need to equilibrate it
     std::vector<double> D(n, 1.0);
-    for(int i = n/3.5; i  < n; i++) D[i] = 0.07; 
+    for(int i = n/2; i  < n; i++) D[i] = pow(2, 0); 
 
     for(int i = 0; i < n; i++) {
         for(int j = 0; j < n; j++) {
@@ -292,7 +293,7 @@ double CG_IR(int n, double scale, float cond, factorization_type fact_type, doub
 
 
 
-    int info = pivoted_cholesky(LL, left_piv, right_piv, mixed_prec_flops ,block_size, tolerance);
+    int info = pivoted_cholesky(LL, left_piv, right_piv, mixed_fact_flops ,block_size, tolerance, dropping_prob);
     cout << "make high prec copy after cholesky \n";
 
     tlapack::lacpy(tlapack::GENERAL, LL, LL_copy);
@@ -308,7 +309,7 @@ double CG_IR(int n, double scale, float cond, factorization_type fact_type, doub
 
   
 
-    int infotoo = cholesky_kernel(LL_double);
+    int infotoo = cholesky_kernel<double>(LL_double);
     if (infotoo != 0)
     {
         cout << " Matrix is not SPD" << endl;
@@ -581,6 +582,8 @@ double CG_IR(int n, double scale, float cond, factorization_type fact_type, doub
         p[i] = r[i];
     }
 
+    bool convd = false;
+
     reg_flops.add_double_flops(4*n);
     double r_norm = tlapack::dot(r, r);
     double b_norm = tlapack::dot(b, b);
@@ -636,10 +639,22 @@ double CG_IR(int n, double scale, float cond, factorization_type fact_type, doub
         r_norm = r_norm_new;
     }
 
+    
     cout << "flops for no preconditioner CG : \n";
     reg_flops.print_stats();
+    cout << "flops for Cholesky : \n";
+    mixed_fact_flops.print_stats();
+    std::cout << " total effective work for mixed Cholesky (normalized to fp8): \n";
+    std::cout << mixed_fact_flops.report_total() << std::endl;
     cout << "flops for CG with precond : \n";
     mixed_prec_flops.print_stats();
+    std::cout << " total effective work for precond CG (normalized to fp8): \n";
+    std::cout << mixed_prec_flops.report_total() << std::endl;
+    
+
+    cout << " improvement in number of flops is : \n";
+    std::vector<n_flops> Cholesky_flops = {mixed_fact_flops, mixed_prec_flops};
+    cout << 1.0/reg_flops.compare_with(Cholesky_flops) << "\n";
 
 
     
@@ -663,7 +678,7 @@ int main(int argc, char **argv)
     int num_precisions;
     bool use_microscal;
     double switching_val, scaling_factor, tolerance, conv_thresh;
-
+    float dropping_prob;
     // refinement params
     int max_gmres_iter, num_iter_1, total_num_iter, num_IR_iter;
     int inner_gmres_num = 0;
@@ -681,13 +696,13 @@ int main(int argc, char **argv)
     std::cout << "setting program vars from JSON" << std::endl;
     set_matrix_params(n, cond, is_symmetric, diag_dom, settings);
     std::cout << "set matrix params" << std::endl;
-    set_factorization_params(fact_type, lowest_prec, highest_prec, is_rank_revealing, pivot_scheme, num_precisions, block_size, use_microscal, stopping_pos, switching_val, scaling_factor, tolerance, settings);
+    set_factorization_params(fact_type, lowest_prec, highest_prec, is_rank_revealing, pivot_scheme, num_precisions, block_size, use_microscal, stopping_pos, switching_val, scaling_factor, tolerance, dropping_prob, settings);
     std::cout << "set factorization params" << std::endl;
     set_refinement_settings(max_gmres_iter, num_iter_1, total_num_iter, refinement_method, precond_kernel, num_IR_iter, inner_gmres_num, arnoldi_subroutine, conv_thresh, settings);
     std::cout << "set refinement params" << std::endl;
 
     std::cout << "beginning factorization" << std::endl;
-    er3 += CG_IR<ml_dtypes::float8_ieee_p<6>, Eigen::half, double, double, double, double, double>(n, scaling_factor, static_cast<float>(cond), fact_type, switching_val, tolerance, conv_thresh, is_symmetric, diag_dom, 999, 0, num_iter_1, total_num_iter, precond_kernel, max_gmres_iter, inner_gmres_num, num_IR_iter, refinement_method, block_size, stopping_pos);
+    er3 += CG_IR<ml_dtypes::float8_ieee_p<6>, Eigen::half, double, double, double, double, double>(n, scaling_factor, static_cast<float>(cond), fact_type, switching_val, tolerance, conv_thresh, is_symmetric, diag_dom, dropping_prob, 999, 0, num_iter_1, total_num_iter, precond_kernel, max_gmres_iter, inner_gmres_num, num_IR_iter, refinement_method, block_size, stopping_pos);
 
     bool verified = abs(er3) < 1e-8;
     FILE *fp = fopen("./log.txt", "w");

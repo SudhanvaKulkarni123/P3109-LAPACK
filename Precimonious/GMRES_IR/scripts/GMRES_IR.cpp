@@ -47,8 +47,7 @@
 using namespace Eigen;
 using namespace ml_dtypes;
 
-enum class factorization_type { standard_LU, two_prec_LU, three_prec_LU, low_prec_store_LU, scaled_two_prec_store_LU, block_low_prec_LU};
-enum class pivoting_scheme { partial, complete, none};
+
 
 
 
@@ -121,7 +120,7 @@ double GMRES_IR(size_t n, double scale, float cond, factorization_type fact_type
 
     float true_cond;
     //construct the matrix in desired precision
-    constructMatrix<float>(n, cond, std::ceil(cond/static_cast<float>(5)) > n-1 ? n-1 : std::ceil(cond/static_cast<float>(5)) , false, FG, p, is_symmetric, true_cond);
+    constructMatrix<float>(n, cond, std::ceil(cond/static_cast<float>(5)) > n-1 ? n-1 : std::ceil(cond/static_cast<float>(5)) , false, FG, p, is_symmetric, false, true_cond);
    
     
 
@@ -806,7 +805,7 @@ int main(int argc, char** argv) {
     //matrix params
     int n;
     float cond;
-    bool is_symmetric;
+    bool is_symmetric, diag_dom;
 
     //fact params
     int block_size, stopping_pos;
@@ -816,7 +815,7 @@ int main(int argc, char** argv) {
     pivoting_scheme pivot_scheme;
     int num_precisions;
     bool use_microscal;
-    double switching_val, scaling_factor, tolerance;
+    double switching_val, scaling_factor, tolerance, conv_thresh;
 
 
 
@@ -837,11 +836,11 @@ int main(int argc, char** argv) {
    
     //set  arguments from settings.json
     std::cout << "setting program vars from JSON" << std::endl;
-    set_matrix_params(n, cond, is_symmetric, settings);
+    set_matrix_params(n, cond, is_symmetric, diag_dom, settings);
     std::cout << "set matrix params" << std::endl;
     set_factorization_params(fact_type, lowest_prec, highest_prec, is_rank_revealing, pivot_scheme, num_precisions, block_size, use_microscal, stopping_pos, switching_val, scaling_factor, tolerance, settings);
     std::cout << "set factorization params" << std::endl;
-    set_refinement_settings(max_gmres_iter, num_iter_1, total_num_iter, refinement_method, precond_kernel, num_IR_iter, inner_gmres_num, arnoldi_subroutine, settings);
+    set_refinement_settings(max_gmres_iter, num_iter_1, total_num_iter, refinement_method, precond_kernel, num_IR_iter, inner_gmres_num, arnoldi_subroutine, conv_thresh, settings);
     std::cout << "set refinement params" << std::endl;
 
     std::cout << "beginning factorization" << std::endl;

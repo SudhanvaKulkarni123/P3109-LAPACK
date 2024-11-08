@@ -9,6 +9,7 @@
 #include "tlapack/blas/gemv.hpp"
 #include "tlapack/plugins/legacyArray.hpp"
 
+
 int numU_to8 = 0;
 int numL_to8 = 0;
 
@@ -365,11 +366,14 @@ void squeezing_matmul(matrixA_t& A, matrixA_t& B, matrixC_t& C, matrixB_t& A_dty
         }
     }
 
-    auto alpha1 = (z2 - z1)/(max_A - min_A);
-    auto alpha2 = (z2 - z1)/(max_B - min_B);
+    auto alpha1 = 1.0/max_A;
+    auto alpha2 =  1.0/max_B;
 
-    auto beta1 = (z1*max_A - z2*min_A)/(max_A - min_A);
-    auto beta2 = (z1*max_B - z2*min_B)/(max_B - min_B);
+    cout << "alpha1 is : " << alpha1 << "\n";
+    cout << "alpha2 is : " << alpha2 << "\n";
+
+    auto beta1 = 0.0;
+    auto beta2 = 0.0;
 
     // squueze into A_dtype and B_dtype
 
@@ -378,7 +382,10 @@ void squeezing_matmul(matrixA_t& A, matrixA_t& B, matrixC_t& C, matrixB_t& A_dty
     {
         for (idx_t j = 0; j < k; j++)
         {
-            A_dtype(i, j) = static_cast<dtype>(alpha1*A(i, j) + beta1);
+            auto tmp = alpha1*A(i, j) + beta1;
+            if(tmp > (float)std::numeric_limits<dtype>::max()) tmp = (float)std::numeric_limits<dtype>::max();
+            A_dtype(i, j) = static_cast<dtype>(tmp);
+            if(isinf(A_dtype(i,j))) std::cout << "encounterd infinity in A!" << std::endl;
             A_sums[i] += alpha1*A(i, j) + beta1;
         }
     }
@@ -389,7 +396,10 @@ void squeezing_matmul(matrixA_t& A, matrixA_t& B, matrixC_t& C, matrixB_t& A_dty
     {
         for (idx_t j = 0; j < n; j++)
         {
-            B_dtype(i, j) = static_cast<dtype>(alpha2*B(i, j) + beta2);
+            auto tmp = alpha2*B(i, j) + beta2;
+            if(tmp > (float)std::numeric_limits<dtype>::max()) tmp = (float)std::numeric_limits<dtype>::max();
+            B_dtype(i, j) = static_cast<dtype>(tmp);
+            if(isinf(B_dtype(i,j))) std::cout << "encounterd infinity in B!" << std::endl;
             B_sums[j] += alpha2*B(i, j) + beta2;
         }
     }
@@ -405,6 +415,7 @@ void squeezing_matmul(matrixA_t& A, matrixA_t& B, matrixC_t& C, matrixB_t& A_dty
             }
             sum -= beta2*A_sums[i] + beta1*B_sums[j] - beta1*beta2*k;
             sum = sum/(alpha1*alpha2);
+            
             C(i, j) -= sum;
         }
     }
@@ -419,6 +430,196 @@ void squeezing_matmul(matrixA_t& A, matrixA_t& B, matrixC_t& C, matrixB_t& A_dty
 
 
 }
+
+
+template<typename matrixA_t, typename matrixB_t, typename matrixC_t, typename mask_t>
+void sparse_squeezing_matmul(matrixA_t& A, matrixA_t& B, matrixC_t& C, matrixB_t& A_dtype, matrixB_t& B_dtype, mask_t masks, float z1, float z2,float dropping_prob=0.5,  int block_size = 4)
+{
+    using idx_t = size_t;
+   using T = type_t<matrixA_t>;
+    using real_t = real_type<T>;
+    using V = type_t<matrixB_t>;
+    using dtype = real_type<V>;
+    using range = std::pair<idx_t, idx_t>;
+    const idx_t m = nrows(A);
+    const idx_t n = ncols(B);
+    const idx_t k = ncols(A);
+
+    // Find signed max and min of A
+    float max_A = -std::numeric_limits<float>::infinity();
+    float min_A = std::numeric_limits<float>::infinity();
+    for (idx_t i = 0; i < m; i++)
+    {
+        for (idx_t j = 0; j < k; j++)
+        {
+            if (abs(A(i,j)) > max_A) max_A = abs(A(i,j));
+            if (A(i,j) < min_A) min_A = A(i,j);
+        }
+    }
+
+    // Find signed max and min in B
+    float max_B = -std::numeric_limits<float>::infinity();
+    float min_B = std::numeric_limits<float>::infinity();
+    for (idx_t i = 0; i < k; i++)
+    {
+        for (idx_t j = 0; j < n; j++)
+        {
+            if (abs(B(i,j)) > max_B) max_B = abs(B(i,j));
+            if (B(i,j) < min_B) min_B = B(i,j);
+        }
+    }
+
+    auto alpha1 = 1.0/max_A;
+    auto alpha2 =  1.0/max_B;
+
+    std::cout << "alpha1 is : " << alpha1 << "\n";
+    std::cout << "alpha2 is : " << alpha2 << "\n";
+
+    auto beta1 = 0.0;
+    auto beta2 = 0.0;
+
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::bernoulli_distribution bernoulli_dist(dropping_prob); // Probability to keep a term
+
+    if(masks.size() < 64) {
+        for(int i = 0; i < masks.size(); i++) std::cout << masks[i] << ", ";
+        std::cout << "\n";
+    }
+
+    // Squeeze into A_dtype and B_dtype
+    std::vector<float> A_sums(m, 0);
+    for (idx_t i = 0; i < m; i++)
+    {
+        for (idx_t j = 0; j < k; j++)
+        {
+            auto tmp = alpha1 * A(i,j) + beta1;
+            if (tmp > (float)std::numeric_limits<dtype>::max()) tmp = (float)std::numeric_limits<dtype>::max();
+            if(bernoulli_dist(gen)) A_dtype(i,j) = static_cast<dtype>(0.0);
+            else A_dtype(i,j) = static_cast<dtype>(tmp);
+            if (isinf(A_dtype(i,j))) std::cout << "Encountered infinity in A!" << std::endl;
+            A_sums[i] += alpha1 * A(i,j) + beta1;
+        }
+    }
+
+    std::vector<float> B_sums(n, 0);
+    for (idx_t i = 0; i < k; i++)
+    {
+        for (idx_t j = 0; j < n; j++)
+        {
+            B_dtype(i,j) = A_dtype(j,i);
+        }
+    }
+
+    // Initialize random number generator for dropping terms
+
+
+    for (idx_t i = 0; i < m; i++)
+    {
+        for (idx_t j = 0; j < n; j++)
+        {
+            float sum = 0;
+            for (idx_t l = 0; l < k; l++)
+            {
+                
+                    sum += static_cast<float>(A_dtype(i,l)) * static_cast<float>(B_dtype(l,j));
+                
+            }
+            sum -= beta2 * A_sums[i] + beta1 * B_sums[j] - beta1 * beta2 * k;
+            sum = sum / (alpha1 * alpha2);
+
+            C(i,j) -= sum;
+        }
+    }
+
+    return;
+}
+
+
+template<TLAPACK_MATRIX matrixA_t, TLAPACK_MATRIX matrixB_t, TLAPACK_MATRIX matrixC_t>
+void scaled_matmul(matrixA_t& A, matrixA_t& B, matrixC_t& C, matrixB_t& A_dtype, matrixB_t& B_dtype, int block_size=4)
+{
+
+    using idx_t = size_type<matrixA_t>;
+    using T = type_t<matrixA_t>;
+    using real_t = real_type<T>;
+    using V = type_t<matrixB_t>;
+    using dtype = real_type<V>;
+    using range = std::pair<idx_t, idx_t>;
+    const idx_t m = nrows(A);
+    const idx_t n = ncols(B);
+    const idx_t k = ncols(A);
+
+    int num_A_blocks = m/block_size;
+    int num_B_blocks = n/block_size;
+    std::vector<float> min_A(num_A_blocks, INFINITY);
+    std::vector<float> min_B(num_B_blocks, INFINITY);
+
+
+    for(idx_t t = 0; t < num_A_blocks; t++) 
+    {
+        for (idx_t i = 0; i < block_size; i++)
+        {
+            for (idx_t j = 0; j < block_size; j++)
+            {
+                if (abs(A(t*block_size + i, j)) < min_A[t]) min_A[t] = abs(A(t*block_size + i, j));
+            }
+        }
+
+    }
+
+    for(idx_t t = 0; t < num_B_blocks; t++) 
+    {
+        for (idx_t i = 0; i < block_size; i++)
+        {
+            for (idx_t j = 0; j < block_size; j++)
+            {
+                if (abs(B(i, t*block_size + j)) < min_B[t]) min_B[t] = abs(B(i, t*block_size + j));
+            }
+        }
+
+    }
+
+    for(int i = 0; i < m; i++) {
+        for(int j = 0; j < k; j++) {
+            A_dtype(i,j) = static_cast<dtype>(A(i,j)/min_A[i/block_size]);
+        }
+    }
+
+    for(int i = 0; i < n; i++) {
+        for(int j = 0; j < k; j++) {
+            B_dtype(j, i) = static_cast<dtype>(B(j,i)/min_B[i/block_size]);
+        }
+
+    }
+
+
+        
+
+
+    for(int i = 0; i < m; i++) 
+    {
+        for(int j = 0; j < n; j++) 
+        {
+            float sum = 0;
+            for(int l = 0; l < k; l++)
+            {
+                sum += (min_A[i/block_size]*min_B[j/block_size]*static_cast<float>(A_dtype(i, l)) * static_cast<float>(B_dtype(l, j)));
+            }
+            std::cout << "sum is : " << sum << "\n";
+            C(i, j) -= sum;
+        }
+    }
+
+
+    return;
+
+
+
+
+}
+
+
 
 
 template<TLAPACK_MATRIX matrixA_t, TLAPACK_MATRIX matrixB_t, TLAPACK_MATRIX matrixC_t>
