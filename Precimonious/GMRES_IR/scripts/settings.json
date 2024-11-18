@@ -1,35 +1,38 @@
 {
-    "matrix settings" : {
-        "n" : "2048",
-        "condition number" : "1000",
-        "symmetric" : "true",
-        "diag_dom" : "false"
+    "matrix settings": {
+        "n": "1024",
+        "condition number": "100",
+        "symmetric": "true",
+        "diag_dom": "false",
+        "work_factor": "2.0"
+
     },
-    "factorization settings" : {
-        "factorization method" : "two_prec_LU",
-        "lowest precision" : "binary8p5",
-        "highest precision" : "half",
-        "is rank revealing" : "false",
-        "pivoting scheme" : "partial", 
-        "num_precisions" : "2",
-        "block size" : "16",
-        "use Microscaling" : "true",
-        "stopping pos" : "99999", 
-        "switching val" : "0.5",
-        "scaling factor" : "1.0",
-        "tolerance" : "0.1",
-        "dropping_prob" : "0.0"
+    "factorization settings": {
+        "factorization method": "two_prec_LU",
+        "chol mod": "NONE",
+        "lowest precision": "binary8p5",
+        "highest precision": "half",
+        "is rank revealing": "false",
+        "pivoting scheme": "partial",
+        "num_precisions": "2",
+        "block size": "32",
+        "use Microscaling": "true",
+        "stopping pos": "99999",
+        "switching val": "0.5",
+        "scaling factor": "1.0",
+        "tolerance": "0.001",
+        "dropping_prob": "0.0"
     },
-    "GMRES settings" : {
-        "max_gmres_iter" : "10000",
-        "num_iter_1" : "0",
-        "total_num_iter" : "10",
-        "refinement_method" : "GMRES",
-        "precond_kernel"  : "NONE",
-        "num_IR_iter" : "10",
-        "inner_gmres_num" : "10",
-        "arnoldi_subroutine" : "MGS",
-        "conv_thresh" : "0.00000000000000001"
+    "GMRES settings": {
+        "max_gmres_iter": "10000",
+        "num_iter_1": "0",
+        "total_num_iter": "10",
+        "refinement_method": "GMRES",
+        "precond_kernel": "NONE",
+        "num_IR_iter": "10",
+        "inner_gmres_num": "10",
+        "arnoldi_subroutine": "MGS",
+        "conv_thresh": "0.00000000000000001"
     }
-    
+
 }

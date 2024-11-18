@@ -4,7 +4,6 @@
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
 #define TLAPACK_PREFERRED_MATRIX_LEGACY
-#include "num_ops.hpp"
 #include <tlapack/plugins/legacyArray.hpp>
 #include <tlapack/plugins/stdvector.hpp>
 #include <tlapack/plugins/float8_iee_p.hpp>
@@ -25,8 +24,8 @@
 #include <tlapack/blas/trsm.hpp>
 #include <tlapack/blas/trmm.hpp>
 #include <tlapack/blas/trmv.hpp>
+
 #include "gemms.hpp"
-#include "pivoted_cholesky.hpp"
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -41,9 +40,11 @@
 #include "scalings.hpp"
 #include "json.hpp"
 #include "getrf_random.hpp"
-#include <fstream>
 #include "python_utils.hpp"
 #include "json_utils.hpp"
+#include "num_ops.hpp"
+#include "pivoted_cholesky.hpp"
+
 
 
 std::ofstream myfile("e5m2_error_f_cond.csv");
@@ -51,10 +52,9 @@ std::ofstream other_file("e5m2_error_e_cond.csv");
 std::ofstream timefile("time.txt");
 
 template <typename F0, typename F1, typename T2, typename T3, typename T4, typename T5, typename T6>
-double CG_IR(int n, double scale, float cond, factorization_type fact_type, double switching_val, double tolerance, double conv_thresh, bool is_symmetric, bool diag_dom, float dropping_prob, int prec, int variant = 0, int num_iter_1 = 0, int num_total_iter = 5, kernel_type precond_mode = kernel_type::LEFT_LU, int max_CG_iter = 20, int inner_num_gmres_iter = 20, int num_IR_iter = 20, refinement_type method = refinement_type::CG_IR, int block_size = 128, int stopping_pos = 99999)
+double CG_IR(int n, double scale, float cond, factorization_type fact_type, double switching_val, double tolerance, double conv_thresh, float work_factor, bool is_symmetric, bool diag_dom, float dropping_prob, chol_mod chol_modif, int prec, int variant = 0, int num_iter_1 = 0, int num_total_iter = 5, kernel_type precond_mode = kernel_type::LEFT_LU, int max_CG_iter = 20, int inner_num_gmres_iter = 20, int num_IR_iter = 20, refinement_type method = refinement_type::CG_IR, int block_size = 128, int stopping_pos = 99999)
 {
-    using matrix_t = tlapack::LegacyMatrix<ml_dtypes::float8_ieee_p<4>>;
-    using block_mat_t = tlapack::BlockMatrix<ml_dtypes::float8_ieee_p<4>>;
+
     using real_t = tlapack::real_type<ml_dtypes::float8_ieee_p<4>>;
     using idx_t = size_t;
     using range = pair<idx_t, idx_t>;
@@ -62,9 +62,9 @@ double CG_IR(int n, double scale, float cond, factorization_type fact_type, doub
     double d_conv_bound = sqrt(static_cast<double>(n)) * std::pow(2, -53);
     double s_conv_bound = sqrt(static_cast<double>(n)) * std::pow(2, -24);
 
-    n_flops mixed_prec_flops; mixed_prec_flops.reset();
-    n_flops reg_flops; reg_flops.reset();
-    n_flops mixed_fact_flops;  mixed_fact_flops.reset();
+    n_flops mixed_prec_flops(work_factor); mixed_prec_flops.reset();
+    n_flops reg_flops(work_factor); reg_flops.reset();
+    n_flops mixed_fact_flops(work_factor);  mixed_fact_flops.reset();
 
     
 
@@ -106,6 +106,9 @@ double CG_IR(int n, double scale, float cond, factorization_type fact_type, doub
     // Zero matrix for whenever we need to initailize a matrix to 0
     std::vector<float> Zero_(n * n);
     tlapack::LegacyMatrix<float, idx_t> Zero(n, n, Zero_.data(), n);
+
+    std::vector<float> X_(n * n);
+    tlapack::LegacyMatrix<float, idx_t> X(n, n, X_.data(), n);
 
     float true_cond;
     // construct the matrix in desired precision
@@ -186,8 +189,8 @@ double CG_IR(int n, double scale, float cond, factorization_type fact_type, doub
     tlapack::LegacyVector<double, idx_t> b_f(n, b_f_.data());
 
     // bd for "true sol" -- may need to change this to quad
-    std::vector<double> bd_(n);
-    tlapack::LegacyVector<double, idx_t> bd(n, bd_.data());
+    // std::vector<double> bd_(n);
+    // tlapack::LegacyVector<double, idx_t> bd(n, bd_.data());
 
     std::vector<double> r_(n);
     tlapack::LegacyVector<double, idx_t> r(n, r_.data());
@@ -247,7 +250,7 @@ double CG_IR(int n, double scale, float cond, factorization_type fact_type, doub
         be_1_1[i] = static_cast<double>(be_1[i]);
         be_1_2[i] = static_cast<T2>(be_1[i]);
         be_1_3[i] = static_cast<T3>(be_1[i]);
-        bd[i] = static_cast<double>(b[i]);
+        //bd[i] = static_cast<double>(b[i]);
     }
 
     // perform LU on A and FG
@@ -293,7 +296,7 @@ double CG_IR(int n, double scale, float cond, factorization_type fact_type, doub
 
 
 
-    int info = pivoted_cholesky(LL, left_piv, right_piv, mixed_fact_flops ,block_size, tolerance, dropping_prob);
+    int info = pivoted_cholesky(LL, left_piv, right_piv, chol_modif, mixed_fact_flops ,block_size, tolerance, dropping_prob);
     cout << "make high prec copy after cholesky \n";
 
     tlapack::lacpy(tlapack::GENERAL, LL, LL_copy);
@@ -309,16 +312,16 @@ double CG_IR(int n, double scale, float cond, factorization_type fact_type, doub
 
   
 
-    int infotoo = cholesky_kernel<double>(LL_double);
-    if (infotoo != 0)
-    {
-        cout << " Matrix is not SPD" << endl;
-        return -1.0;
-    }
+    // int infotoo = cholesky_kernel<double>(LL_double);
+    // if (infotoo != 0)
+    // {
+    //     cout << " Matrix is not SPD" << endl;
+    //     return -1.0;
+    // }
 
     // compute true soln in double
-    tlapack::trsv(tlapack::LOWER_TRIANGLE, tlapack::NO_TRANS, Diag::NonUnit, LL_double, bd);
-    tlapack::trsv(tlapack::LOWER_TRIANGLE, tlapack::TRANSPOSE, Diag::NonUnit, LL_double, bd);
+    // tlapack::trsv(tlapack::LOWER_TRIANGLE, tlapack::NO_TRANS, Diag::NonUnit, LL_double, bd);
+    // tlapack::trsv(tlapack::LOWER_TRIANGLE, tlapack::TRANSPOSE, Diag::NonUnit, LL_double, bd);
 
     //"true sol" in bd, now compute init sol with custom Cholesky
 
@@ -368,8 +371,21 @@ double CG_IR(int n, double scale, float cond, factorization_type fact_type, doub
     std::cout << "initial norm_x = " << norm_x <<  std::endl;
     std::cout << "norm A = " << normA << std::endl;
     std::cout << "Initial backward error is: " << initial_backward_error << std::endl;
+    std::cout << "now computing condition number for preconditioned A\n";
     
 
+    tlapack::lacpy(tlapack::GENERAL, FG, X);
+
+    for(int i = 0; i < n; i++) {
+        auto ttmp = tlapack::col(X, left_piv[i]);
+        auto ttmp2 = tlapack::col(X, i);
+        tlapack::swap(ttmp, ttmp2);
+        auto ttmp3 = tlapack::row(X, left_piv[i]);
+        auto ttmp4 = tlapack::row(X, i);
+        tlapack::swap(ttmp3, ttmp4);
+    }
+
+    
 
     double nrmb = tlapack::nrm2(b);
     
@@ -435,7 +451,7 @@ double CG_IR(int n, double scale, float cond, factorization_type fact_type, doub
     }
     mixed_prec_flops.add_double_flops(n);
 
-
+    int p_iter = 0;
     // Start CG iterations
     for (int j = 0; j < max_CG_iter; j++) {
         // Compute Ap = A * p
@@ -481,6 +497,7 @@ double CG_IR(int n, double scale, float cond, factorization_type fact_type, doub
         
         // Check for convergence
         if (scaled_residual < d_conv_bound) {
+            p_iter = j+1;
             std::cout << "Converged to desired precision in " << j + 1 << " iterations." << std::endl;
             break;
         }
@@ -560,11 +577,11 @@ double CG_IR(int n, double scale, float cond, factorization_type fact_type, doub
     
     // Compute forward error if exact solution bd is known
         std::vector<double> error(n, 0.0);
-        for(int i = 0; i < n; i++) {
-            error[i] = x[i] - bd[i];
-        }
-        double forward_error = inf_norm(error) / inf_norm(bd);
-        std::cout << "Forward error is: " << forward_error << std::endl;
+        // for(int i = 0; i < n; i++) {
+        //     error[i] = x[i] - bd[i];
+        // }
+        // double forward_error = inf_norm(error) / inf_norm(bd);
+        // std::cout << "Forward error is: " << forward_error << std::endl;
     
     
     // Optional: Compute norm of x
@@ -583,6 +600,7 @@ double CG_IR(int n, double scale, float cond, factorization_type fact_type, doub
     }
 
     bool convd = false;
+    int v_iters = 0;
 
     reg_flops.add_double_flops(4*n);
     double r_norm = tlapack::dot(r, r);
@@ -621,6 +639,7 @@ double CG_IR(int n, double scale, float cond, factorization_type fact_type, doub
         other_file << iter << "," << rel_residual << std::endl;
 
         if (rel_residual < d_conv_bound) {
+            v_iters = iter;
             std::cout << "Converged to double in " << iter << " iterations." << std::endl;
             break;
         }
@@ -656,6 +675,24 @@ double CG_IR(int n, double scale, float cond, factorization_type fact_type, doub
     std::vector<n_flops> Cholesky_flops = {mixed_fact_flops, mixed_prec_flops};
     cout << 1.0/reg_flops.compare_with(Cholesky_flops) << "\n";
 
+    std::cout << "logging results...... \n";
+
+    string new_file = "results/n" + std::to_string(n) + "cond" + std::to_string((int)cond) + ".txt";
+
+    std::ofstream newfile;
+
+
+    newfile.open(new_file, std::ios::app);
+
+    newfile << "eps_prime : " << tolerance << "\n";
+    newfile << "Cholesky flops : \n";
+    n_flops::log_all(newfile, Cholesky_flops);
+    newfile << "number of iterations for precond_CG : " << p_iter << "\n";
+    newfile << "CG flops : \n";
+    reg_flops.log_results(newfile);
+    newfile << "number of iterations for vanilla_CG : " << v_iters << "\n";
+
+    newfile.close();
 
     
     return final_backward_error;
@@ -666,12 +703,13 @@ int main(int argc, char **argv)
 
     // matrix params
     int n;
-    float cond;
+    float cond, work_factor;
     bool is_symmetric, diag_dom;
 
     // fact params
     int block_size, stopping_pos;
     factorization_type fact_type;
+    chol_mod chol_modif;
     string lowest_prec, highest_prec;
     bool is_rank_revealing;
     pivoting_scheme pivot_scheme;
@@ -694,15 +732,15 @@ int main(int argc, char **argv)
 
     // set  arguments from settings.json
     std::cout << "setting program vars from JSON" << std::endl;
-    set_matrix_params(n, cond, is_symmetric, diag_dom, settings);
+    set_matrix_params(n, cond, is_symmetric, diag_dom, work_factor, settings);
     std::cout << "set matrix params" << std::endl;
-    set_factorization_params(fact_type, lowest_prec, highest_prec, is_rank_revealing, pivot_scheme, num_precisions, block_size, use_microscal, stopping_pos, switching_val, scaling_factor, tolerance, dropping_prob, settings);
+    set_factorization_params(fact_type, chol_modif, lowest_prec, highest_prec, is_rank_revealing, pivot_scheme, num_precisions, block_size, use_microscal, stopping_pos, switching_val, scaling_factor, tolerance, dropping_prob, settings);
     std::cout << "set factorization params" << std::endl;
     set_refinement_settings(max_gmres_iter, num_iter_1, total_num_iter, refinement_method, precond_kernel, num_IR_iter, inner_gmres_num, arnoldi_subroutine, conv_thresh, settings);
     std::cout << "set refinement params" << std::endl;
 
     std::cout << "beginning factorization" << std::endl;
-    er3 += CG_IR<ml_dtypes::float8_ieee_p<6>, Eigen::half, double, double, double, double, double>(n, scaling_factor, static_cast<float>(cond), fact_type, switching_val, tolerance, conv_thresh, is_symmetric, diag_dom, dropping_prob, 999, 0, num_iter_1, total_num_iter, precond_kernel, max_gmres_iter, inner_gmres_num, num_IR_iter, refinement_method, block_size, stopping_pos);
+    er3 += CG_IR<ml_dtypes::float8_ieee_p<6>, Eigen::half, double, double, double, double, double>(n, scaling_factor, static_cast<float>(cond), fact_type, switching_val, tolerance, conv_thresh, work_factor, is_symmetric, diag_dom, dropping_prob, chol_modif, 999, 0, num_iter_1, total_num_iter, precond_kernel, max_gmres_iter, inner_gmres_num, num_IR_iter, refinement_method, block_size, stopping_pos);
 
     bool verified = abs(er3) < 1e-8;
     FILE *fp = fopen("./log.txt", "w");

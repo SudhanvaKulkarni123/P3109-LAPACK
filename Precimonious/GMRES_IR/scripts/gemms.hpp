@@ -48,7 +48,7 @@ void simple_gemm(matrixA_t& A, matrixB_t& B, matrixC_t& C, scal_t scale_by = 1.0
 /// @param B 
 /// @param C 
 template<TLAPACK_MATRIX matrixA_t, TLAPACK_MATRIX matrixB_t, TLAPACK_MATRIX matrixC_t>
-void block_gemm(matrixA_t& A, matrixA_t& B, matrixA_t& C, matrixB_t& A_dtype, matrixC_t& B_dtype)
+void block_gemm(matrixA_t& A, matrixA_t& B, matrixA_t& C, matrixB_t& A_dtype, matrixC_t& B_dtype, int block_size = 4)
 {
     using idx_t = size_type<matrixA_t>;
     using T = type_t<matrixA_t>;
@@ -67,35 +67,35 @@ void block_gemm(matrixA_t& A, matrixA_t& B, matrixA_t& C, matrixB_t& A_dtype, ma
     //first find max exp in all rows for A
     std::vector<int> max_exp_A1(m, 0);
     std::vector<int> max_exp_A2(m, 0);
-    for (idx_t i = 0; i < m; i++)
-    {   
-        if(blocks){
-        int max_exp = -999;
-        for (idx_t j = 0; j < k; j++)
-        {
-            if (int(floor(log2(abs(A(i, j))))) > max_exp) max_exp = int(floor(log2(abs(A(i, j)))));
-        }
-        max_exp_A1[i] = 0;
-        } else {
-            max_exp_A1[i] = 0;
-        }
-    }
+    // for (idx_t i = 0; i < m; i++)
+    // {   
+    //     if(blocks){
+    //     int max_exp = -999;
+    //     for (idx_t j = 0; j < k; j++)
+    //     {
+    //         if (int(floor(log2(abs(A(i, j))))) > max_exp) max_exp = int(floor(log2(abs(A(i, j)))));
+    //     }
+    //     max_exp_A1[i] = 0;
+    //     } else {
+    //         max_exp_A1[i] = 0;
+    //     }
+    // }
 
     //now find max exp in all columns for B
     std::vector<int> max_exp_B1(n, 0);
-    for (idx_t j = 0; j < n; j++)
-    {   
-        if(blocks){
-        int max_exp = -999;
-        for (idx_t i = 0; i < k; i++)
-        {
-            if (int(floor(log2(abs(B(i, j))))) > max_exp) max_exp = int(floor(log2(abs(B(i, j)))));
-        }
-        max_exp_B1[j] = 0;
-        } else {
-            max_exp_B1[j] = 0;
-        }
-    }
+    // for (idx_t j = 0; j < n; j++)
+    // {   
+    //     if(blocks){
+    //     int max_exp = -999;
+    //     for (idx_t i = 0; i < k; i++)
+    //     {
+    //         if (int(floor(log2(abs(B(i, j))))) > max_exp) max_exp = int(floor(log2(abs(B(i, j)))));
+    //     }
+    //     max_exp_B1[j] = 0;
+    //     } else {
+    //         max_exp_B1[j] = 0;
+    //     }
+    // }
 
     //now scale A and B accordingly -- A is lower triangular, B upper
     for (idx_t i = 0; i < m; i++)
@@ -115,23 +115,38 @@ void block_gemm(matrixA_t& A, matrixA_t& B, matrixA_t& C, matrixB_t& A_dtype, ma
     }
 
     //now perform the matmul as would be done in tensor cores
-    for (idx_t i = 0; i < m; i++)
+    for (idx_t ii = 0; ii < m; ii += block_size)
+{
+    for (idx_t jj = 0; jj < n; jj += block_size)
     {
-        for (idx_t j = 0; j < n; j++)
+        for (idx_t ll = 0; ll < k; ll += block_size)
         {
-            float sum = 0;
-            for (idx_t l = 0; l < k; l++)
+            for (idx_t i = ii; i < std::min(ii + block_size, m); i++)
             {
-                auto first_leftover  = static_cast<dtype>(std::pow(2,7)*(static_cast<float>(A(i,l)) - std::pow(2.0,max_exp_A1[i])*static_cast<float>(A_dtype(i,l))));
-                auto second_leftover = static_cast<dtype2>(std::pow(2,7)*(static_cast<float>(B(l,j)) - std::pow(2.0,max_exp_B1[j])*static_cast<float>(B_dtype(l,j))));
-                //sum += static_cast<float>(static_cast<float>(std::pow(2,7))*static_cast<float>(A_dtype(i, l)) * static_cast<float>(B_dtype(l, j)) + (static_cast<float>((first_leftover)) * static_cast<float>(B_dtype(l, j)) + static_cast<float>(A_dtype(i, l)) * static_cast<float>((second_leftover))))/std::pow(2, 7);
-                // + std::pow(2,-14)*(static_cast<float>(first_leftover) * static_cast<float>(second_leftover));
-                sum += static_cast<float>(A_dtype(i, l)) * static_cast<float>(B_dtype(l, j));
+                for (idx_t j = jj; j < std::min(jj + block_size, n); j++)
+                {
+                    float sum = 0;
+                    for (idx_t l = ll; l < std::min(ll + block_size, k); l++)
+                    {
+                    //     auto first_leftover = static_cast<dtype>(std::pow(2, 7) * 
+                    //         (static_cast<float>(A(i, l)) - std::pow(2.0, max_exp_A1[i]) * static_cast<float>(A_dtype(i, l))));
+                    //     auto second_leftover = static_cast<dtype2>(std::pow(2, 7) * 
+                    //         (static_cast<float>(B(l, j)) - std::pow(2.0, max_exp_B1[j]) * static_cast<float>(B_dtype(l, j))));
+
+                        sum += static_cast<float>(A_dtype(i, l)) * static_cast<float>(B_dtype(l, j));
+                        
+                        // sum += (static_cast<float>(std::pow(2, 7)) * static_cast<float>(A_dtype(i, l)) * static_cast<float>(B_dtype(l, j)) +
+                        //         (static_cast<float>(first_leftover) * static_cast<float>(B_dtype(l, j)) +
+                        //          static_cast<float>(A_dtype(i, l)) * static_cast<float>(second_leftover))) / std::pow(2, 7);
+                    }
+                    C(i, j) -= sum;
+                }
             }
-            C(i, j) -= sum*std::pow(2.0,max_exp_A1[i] + max_exp_B1[j]);
         }
     }
-    isNanorInf(C);
+}
+
+    
     // Free the vectors max_exp_A and max_exp_B
 
 
@@ -315,7 +330,7 @@ void fbfmatmul_fp16(matrixA_t& A, matrixA_t& B, matrixA_t& C, matrixB_t& A_dtype
             C(i, j) -= sum*std::pow(2.0,max_exp_A1[i] + max_exp_B1[j]);
         }
     }
-    isNanorInf(C);
+   
     // Free the vectors max_exp_A and max_exp_B
 
 
@@ -352,7 +367,6 @@ void squeezing_matmul(matrixA_t& A, matrixA_t& B, matrixC_t& C, matrixB_t& A_dty
         for (idx_t j = 0; j < k; j++)
         {
             if ((A(i, j)) > max_A) max_A = (A(i, j));
-            if ((A(i, j)) < min_A) min_A = (A(i, j));
         }
     }
 
@@ -362,7 +376,6 @@ void squeezing_matmul(matrixA_t& A, matrixA_t& B, matrixC_t& C, matrixB_t& A_dty
         for (idx_t j = 0; j < n; j++)
         {
             if ((B(i, j)) > max_B) max_B = (B(i, j));
-            if ((B(i, j)) < min_B) min_B = (B(i, j));
         }
     }
 
@@ -386,7 +399,6 @@ void squeezing_matmul(matrixA_t& A, matrixA_t& B, matrixC_t& C, matrixB_t& A_dty
             if(tmp > (float)std::numeric_limits<dtype>::max()) tmp = (float)std::numeric_limits<dtype>::max();
             A_dtype(i, j) = static_cast<dtype>(tmp);
             if(isinf(A_dtype(i,j))) std::cout << "encounterd infinity in A!" << std::endl;
-            A_sums[i] += alpha1*A(i, j) + beta1;
         }
     }
 
@@ -400,25 +412,27 @@ void squeezing_matmul(matrixA_t& A, matrixA_t& B, matrixC_t& C, matrixB_t& A_dty
             if(tmp > (float)std::numeric_limits<dtype>::max()) tmp = (float)std::numeric_limits<dtype>::max();
             B_dtype(i, j) = static_cast<dtype>(tmp);
             if(isinf(B_dtype(i,j))) std::cout << "encounterd infinity in B!" << std::endl;
-            B_sums[j] += alpha2*B(i, j) + beta2;
         }
     }
 
-    for(int i = 0; i < m; i++) 
-    {
-        for(int j = 0; j < n; j++) 
-        {
-            float sum = 0;
-            for(int l = 0; l < k; l++)
-            {
-                sum += (static_cast<float>(A_dtype(i, l)) * static_cast<float>(B_dtype(l, j)));
+    for (int ii = 0; ii < m; ii += block_size) {
+    for (int jj = 0; jj < n; jj += block_size) {
+        for (int kk = 0; kk < k; kk += block_size) {
+            for (int i = ii; i < ii + block_size; i++) {
+                for (int j = jj; j < jj + block_size; j++) {
+                    float sum = 0;
+                    for (int l = kk; l < kk + block_size; l++) {
+                        sum += (static_cast<float>(A_dtype(i, l)) * static_cast<float>(B_dtype(l, j)));
+                    }
+                    if (kk + block_size >= k) { // Only scale and subtract in the final kk loop
+                        sum = sum / (alpha1 * alpha2);
+                        C(i, j) -= sum;
+                    }
+                }
             }
-            sum -= beta2*A_sums[i] + beta1*B_sums[j] - beta1*beta2*k;
-            sum = sum/(alpha1*alpha2);
-            
-            C(i, j) -= sum;
         }
     }
+}
 
 
     return;
@@ -514,23 +528,30 @@ void sparse_squeezing_matmul(matrixA_t& A, matrixA_t& B, matrixC_t& C, matrixB_t
     // Initialize random number generator for dropping terms
 
 
-    for (idx_t i = 0; i < m; i++)
+    for (idx_t ii = 0; ii < m; ii += block_size)
+{
+    for (idx_t jj = 0; jj < n; jj += block_size)
     {
-        for (idx_t j = 0; j < n; j++)
+        for (idx_t ll = 0; ll < k; ll += block_size)
         {
-            float sum = 0;
-            for (idx_t l = 0; l < k; l++)
-            {
-                
-                    sum += static_cast<float>(A_dtype(i,l)) * static_cast<float>(B_dtype(l,j));
-                
-            }
-            sum -= beta2 * A_sums[i] + beta1 * B_sums[j] - beta1 * beta2 * k;
-            sum = sum / (alpha1 * alpha2);
 
-            C(i,j) -= sum;
+            for (idx_t i = ii; i < std::min(ii + block_size, m); i++)
+            {
+                for (idx_t j = jj; j < std::min(jj + block_size, n); j++)
+                {
+                    float sum = 0;
+                    for (idx_t l = ll; l < std::min(ll + block_size, k); l++)
+                    {
+                        sum += static_cast<float>(A_dtype(i, l)) * static_cast<float>(B_dtype(l, j));
+                    }
+
+                    C(i, j) -= sum/(alpha1*alpha2);
+                }
+            }
         }
     }
+}
+
 
     return;
 }

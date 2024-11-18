@@ -12,6 +12,8 @@
 #include <fstream>
 #include <queue>
 
+
+
 template<TLAPACK_MATRIX matrix_t>
 bool is_symm(matrix_t& A) {
     
@@ -38,7 +40,7 @@ int max_index(vector_t& v, int start) {
 }
 //function for regular unblocked Cholesky decomp. returns decomp in lower part of matrix
 template<TLAPACK_SCALAR eps_t, TLAPACK_MATRIX matrix_t>
-int cholesky_kernel(matrix_t& A)
+int cholesky_kernel(matrix_t& A, float eta = 1.0, float ksi = 1.0, int N = 1024, chol_mod chol_modif = chol_mod::NONE, bool phase2 = false, float prev_err = 0.0)
 {   
     using idx_t = size_type<matrix_t>;
     using T = type_t<matrix_t>;
@@ -48,7 +50,7 @@ int cholesky_kernel(matrix_t& A)
     for (int i = 0; i < n; i++) {
       
     tmp = A(i,i);
-    auto prev_tmp = tmp;
+    
     
 
     for (int k = 0; k < i; k++) {
@@ -67,11 +69,43 @@ int cholesky_kernel(matrix_t& A)
     //     cout << "tmp after prturbation : " << tmp << "\n";
     // }
 
+
+ 
+
     auto mach_eps = (float)std::numeric_limits<eps_t>::epsilon();
-    if( tmp <= 0 ) tmp = A(i,i) + (float)std::numeric_limits<eps_t>::epsilon();
-   tmp = abs(tmp) > mach_eps ? abs(tmp) : mach_eps;
+    auto NUN = (float)std::numeric_limits<eps_t>::min();
+    auto DUN = (float)std::numeric_limits<eps_t>::denorm_min();
+    auto beta_sq = std::max(eta, std::max(ksi/ (float)sqrt(N*N - 1), (float)mach_eps));
+    // if( tmp <= 0 ) { 
+    //     tmp = A(i,i) + (float)std::numeric_limits<eps_t>::epsilon(); std::cout << "negative entry! perturbing to preserve +veness";
+    // } 
+    auto prev_tmp = tmp;
+    if(chol_modif == chol_mod::GMW81)
+    {
+        tmp = abs(tmp) > mach_eps ? abs(tmp) : mach_eps;
+        // tmp = tmp > b_inf*b_inf/ beta_sq ? tmp : b_inf*b_inf/ beta_sq;
+        tmp = tmp > prev_err ? tmp : prev_err;
+        prev_err = std::max(prev_err, tmp - prev_tmp);
+    }
+    else if (phase2 && chol_modif == chol_mod::SE90)
+    {
+        auto pert = std::max((float)0.0, std::max((float)b_norm - tmp, prev_err));
+        tmp = tmp + pert;
+        prev_err = pert;
+    }
+    else if (phase2 && chol_modif == chol_mod::SE99) 
+    {
+        float buf = std::max((float)b_norm, prev_err);
+        auto pert = std::max((float)0.0, -tmp + buf);
+        tmp = tmp + pert;
+        prev_err = pert;
+    }
     
+    
+    
+
     A(i,i) = sqrt((tmp));  
+    
 
     for (int j = i+1; j < n; j++) {
         tmp = A(j,i);
@@ -130,12 +164,16 @@ void cholesky_kernel_test()
 
 std::ofstream logfile("mgs.txt");
 
+/// function to updated diagonal entry and check for update precision and modified cholesky phase switching
 template<TLAPACK_SCALAR scalar_t, TLAPACK_MATRIX matrix_t, TLAPACK_VECTOR vector_t>
-void update_diag(matrix_t& L, vector_t& updated_A, matrix_t& A, vector_t& masks)
+bool update_diag(matrix_t& L, vector_t& updated_A, matrix_t& A, vector_t& diag_A, vector_t& masks, chol_mod chol_modif, float tau = 1.0, float gamma = 1.0, float mu = 1.0)
 {
     using idx_t = size_type<matrix_t>;
     int n = nrows(L);
     int b = ncols(L);
+
+    bool to_ret = true;
+   
 
     for(int i = 0; i < n; i++) updated_A[i] = A(i,i);
 
@@ -148,6 +186,13 @@ void update_diag(matrix_t& L, vector_t& updated_A, matrix_t& A, vector_t& masks)
             to_print_sum += L(i,j)*L(i,j);
             
         }
+        if(chol_modif == chol_mod::SE99) {
+            to_ret = to_ret & (updated_A[i] < tau*gamma);
+        } else if(chol_modif == chol_mod::SE90) {
+            to_ret = to_ret & (updated_A[i] < -mu*diag_A[i] || updated_A[i] < -mu*gamma);
+        }
+
+
 
         logfile << "to_print_sum = " << to_print_sum << "\n";
         logfile <<  "sample element = " << L(0,0) << std::endl;
@@ -156,15 +201,14 @@ void update_diag(matrix_t& L, vector_t& updated_A, matrix_t& A, vector_t& masks)
 
     }
 
-    std::cout << "updated[n-1] = " << updated_A[n - 1] << "\n";
 
     for(int i = 0; i < n; i++) {
-        if(updated_A[i] <= 0) {masks[i] = 0.0; std::cout << "zero mask!\n";}
+        if(updated_A[i] <= 0) {masks[i] = 0.0;}
         else masks[i] = 1.0;
     }
 
 
-    return;
+    return to_ret;
 
 }
 
@@ -173,7 +217,7 @@ bool can_use_type(matrix_t& A, vector_t& diag_A, vector_t& updated_A, double eps
 {
     int n = size(diag_A);
 
-   
+    
     double mach_eps = (double)std::numeric_limits<scalar_t>::epsilon();
     
     for(int i = 0; i < n; i++) {     
@@ -182,6 +226,8 @@ bool can_use_type(matrix_t& A, vector_t& diag_A, vector_t& updated_A, double eps
     
     return true;   
 }
+
+
 
 
 
@@ -200,7 +246,7 @@ public:
 
 
 template<TLAPACK_MATRIX matrix_t, TLAPACK_VECTOR piv_t>
-int pivoted_cholesky(matrix_t& A, piv_t& left_piv, piv_t& right_piv, n_flops& flop_counter,  int r = 32, double tol = 0.0000000000001, float dropping_prob = 0.1)
+int pivoted_cholesky(matrix_t& A, piv_t& left_piv, piv_t& right_piv, chol_mod& chol_modif, n_flops& flop_counter,  int r = 32, double tol = 0.0000000000001, float dropping_prob = 0.1)
 {
     using idx_t = size_type<matrix_t>;
     using T = type_t<matrix_t>;
@@ -213,6 +259,11 @@ int pivoted_cholesky(matrix_t& A, piv_t& left_piv, piv_t& right_piv, n_flops& fl
     using gemm_type3 = ml_dtypes::float8_ieee_p<6>;
 
 
+    #ifdef STOCHASTIC_ROUND
+    std::cout << "using stochastic rounding!" << std::endl;
+    #endif
+
+
 
     Create<LegacyMatrix<gemm_type, idx_t>> gemm_matrix;
     Create<LegacyMatrix<gemm_type2, idx_t>> gemm_2_matrix;
@@ -220,6 +271,16 @@ int pivoted_cholesky(matrix_t& A, piv_t& left_piv, piv_t& right_piv, n_flops& fl
 
     idx_t n = nrows(A);
     int q = n/r;
+    bool phase2 = false;
+
+    T ksi = -std::numeric_limits<T>::infinity();
+    T eta = -std::numeric_limits<T>::infinity();
+
+    for(int i = 0; i < n; i++) {
+        for(int j = 0; j < n; j++) {
+            if(j != i) ksi = (ksi > abs(A(i,j))) ? ksi : abs(A(i,j));
+        }
+    }
 
 
     using val_idx = pair<T, int>;
@@ -258,6 +319,9 @@ int pivoted_cholesky(matrix_t& A, piv_t& left_piv, piv_t& right_piv, n_flops& fl
         
     }
 
+    eta = diag_A[0];
+
+
     bool sorted = true;
     for(int i = 0; i < n-1; i++) {
         if(diag_A[i] < diag_A[i+1]) { sorted = false; cout << "not sorted"; break;}
@@ -277,20 +341,19 @@ int pivoted_cholesky(matrix_t& A, piv_t& left_piv, piv_t& right_piv, n_flops& fl
     int swich = 2;
     for(int i = 0; i < q; i++) 
     {
-        std::cout << "iter i = " << i << std::endl;
         auto A00 = tlapack::slice(A, range(i*r, (i+1)*r), range(i*r, (i+1)*r));
          
 
         
-        if(swich == 0) cholesky_kernel<gemm_type3>(A00);
-        else if(swich == 1) cholesky_kernel<gemm_type2>(A00);
-        else cholesky_kernel<gemm_type>(A00);
+        if(swich == 0) cholesky_kernel<gemm_type3>(A00, eta, ksi, n, chol_modif, phase2);
+        else if(swich == 1) cholesky_kernel<gemm_type2>(A00, eta, ksi, n, chol_modif, phase2);
+        else cholesky_kernel<gemm_type>(A00, eta, ksi, n, chol_modif, phase2);
         flop_counter.add_float_flops(r*r*r/3);
         
 
 
         if(!is_symm(A00)) {
-            throw std::runtime_error("A00 is not symm"); 
+            throw std::runtime_error("A00 is not SPD!"); 
         }
 
         auto A01 = tlapack::slice(A ,  range((i)*r, (i+1)*r), range((i+1)*r, n));
@@ -298,6 +361,15 @@ int pivoted_cholesky(matrix_t& A, piv_t& left_piv, piv_t& right_piv, n_flops& fl
 
         tlapack::trsm(tlapack::LEFT_SIDE, Uplo::Lower, tlapack::NO_TRANS, tlapack::Diag::NonUnit, 1.0, A00, A01);
         flop_counter.add_float_flops(r*r*r*(q - i - 1));
+
+        // if(swich == 0) {
+        //     for(int i = 0; i < nrows(A01); i++) {
+        //         for(int j = 0; j < ncols(A01); j++) {
+        //             A01(i,j) = static_cast<float>(static_cast<gemm_type2>(A01(i,j)));
+        //         }
+        //     }
+       
+        // }
 
 
         //need to provide alternate check where eps_8*A(i, i) < eps'*diag_A[i] for indices in the Schur complement
@@ -318,8 +390,9 @@ int pivoted_cholesky(matrix_t& A, piv_t& left_piv, piv_t& right_piv, n_flops& fl
         auto update_left = std::vector<T>(updated_diag.begin() + i*r + r, updated_diag.end());
         auto masks_left = std::vector<T>(masks.begin() + i*r + r, masks.end());
         if(i*r + r == n) return 0;
- 
-        update_diag<float>(A10, update_left, A11, masks_left);
+
+        //tau = 0.25, mu = 0.001
+        phase2 = update_diag<float>(A10, update_left, A11, diag_left, masks_left, chol_modif, 0.00025, eta, 0.001);
 
         
 
@@ -333,7 +406,7 @@ int pivoted_cholesky(matrix_t& A, piv_t& left_piv, piv_t& right_piv, n_flops& fl
             auto buf_L = gemm_3_matrix(buf_L_, n - (i+1)*r, r);
             std::vector<gemm_type3> buf_U_(r * (n - (i+1)*r));
             auto buf_U = gemm_3_matrix(buf_U_, r, n - (i+1)*r);
-            sparse_squeezing_matmul(A10, A01, A11, buf_L, buf_U, masks_left, -1.0, 1.0, dropping_prob);
+            squeezing_matmul(A10, A01, A11, buf_L, buf_U, -1.0, 1.0, r);
             //block_gemm(A10, A01, A11, buf_L, buf_U);
             //scaled_matmul(A10, A01, A11, buf_L, buf_U, r);
             if(dropping_prob != 1.0) flop_counter.add_fp8_flops(r*(n - (i+1)*r)*(n - (i+1)*r));
@@ -344,7 +417,7 @@ int pivoted_cholesky(matrix_t& A, piv_t& left_piv, piv_t& right_piv, n_flops& fl
             auto buf_L = gemm_2_matrix(buf_L_, n - (i+1)*r, r);
             std::vector<gemm_type2> buf_U_(r * (n - (i+1)*r));
             auto buf_U = gemm_2_matrix(buf_U_, r, n - (i+1)*r);
-            block_gemm(A10, A01, A11, buf_L, buf_U);
+            block_gemm(A10, A01, A11, buf_L, buf_U, r);
             //squeezing_matmul(A10, A01, A11, buf_L, buf_U, -1.0, 1.0);
             flop_counter.add_half_flops(r*(n - (i+1)*r)*(n - (i+1)*r));
         } else {
@@ -354,7 +427,7 @@ int pivoted_cholesky(matrix_t& A, piv_t& left_piv, piv_t& right_piv, n_flops& fl
             auto buf_L = gemm_matrix(buf_L_, n - (i+1)*r, r);
             std::vector<gemm_type> buf_U_(r * (n - (i+1)*r));
             auto buf_U = gemm_matrix(buf_U_, r, n - (i+1)*r);
-            block_gemm(A10, A01, A11, buf_L, buf_U);
+            block_gemm(A10, A01, A11, buf_L, buf_U, r);
             flop_counter.add_float_flops(r*(n - (i+1)*r)*(n - (i+1)*r));
 
         }

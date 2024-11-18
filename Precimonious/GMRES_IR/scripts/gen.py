@@ -89,7 +89,7 @@ def init_matrix(dim1, dim2, cond, is_geom,is_symmetric, is_diag_dom, lst):
 
     
     if is_diag_dom :
-        A = np.random.rand(dim1, dim2)
+        A = cp.random.rand(dim1, dim2)
         m = dim1
         n= dim2
         
@@ -224,13 +224,7 @@ def LU_gen(n1,cond,m, mode, p, is_symmetric, is_diag_dom):
         else :
             diag_A = np.diag(A)
             diag_A = np.sqrt(diag_A)
-            D_inv = np.linalg.inv(np.diag(diag_A))
-            print(D_inv[0,0])
-            print(np.sqrt(1/A[0,0]))
-
-            equilibrated_A = D_inv @ A @ D_inv
-
-            to_ret.append(np.linalg.cond(equilibrated_A))
+            to_ret.append(np.linalg.cond(A))
         return to_ret
     a_values = set_vals(p)
     A_orig = init_matrix(n1, n1, cond, mode, a_values)
