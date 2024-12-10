@@ -8,9 +8,10 @@ struct n_flops {
     long n_flops_half;
     long n_flops_bfloat;
     long n_flops_fp8;
+    float work_factor;
 
 public:
-    n_flops() : n_flops_double(0), n_flops_float(0), n_flops_half(0), n_flops_bfloat(0), n_flops_fp8(0) {}
+    n_flops(float WF = 2.0) : n_flops_double(0), n_flops_float(0), n_flops_half(0), n_flops_bfloat(0), n_flops_fp8(0), work_factor(WF) {}
 
     void reset() {
         n_flops_double = 0;
@@ -98,6 +99,41 @@ public:
     double report_total() {
         long algo_work = 8*get_double_flops() + 4*get_float_flops() + 2*get_half_flops() + 2*get_bfloat_flops() + get_fp8_flops();
         return (double) algo_work;
+    }
+
+    void log_results(std::ofstream& logfile, bool use_sci = true) {
+        if(use_sci) std::cout << std::scientific;
+        logfile << "double flops : " << (double)get_double_flops() << "\n";
+        logfile << "float flops : " << (double)get_float_flops() << "\n";
+        logfile << "half flops : " << (double)get_half_flops() << "\n";
+        logfile << "bfloat flops : " << (double)get_bfloat_flops() << "\n";
+        logfile << "fp8 flops : " << (double)get_fp8_flops() << "\n";
+        return;
+    }
+
+    static void log_all(std::ofstream& logfile, std::vector<n_flops>& algo, bool use_sci = true) {
+        if(use_sci) std::cout << std::scientific;
+
+        long double_count = 0;
+        long float_count = 0;
+        long half_count = 0;
+        long bfloat_count = 0;
+        long fp8_count = 0;
+
+        for( auto a : algo ) {
+            double_count += a.get_double_flops();
+            float_count += a.get_float_flops();
+            half_count += a.get_half_flops();
+            bfloat_count += a.get_bfloat_flops();
+            fp8_count += a.get_fp8_flops();
+        }
+
+        logfile << "double flops : " << (double)double_count << "\n";
+        logfile << "float flops : " << (double)float_count << "\n";
+        logfile << "half flops : " << (double)half_count << "\n";
+        logfile << "bfloat flops : " << (double)bfloat_count << "\n";
+        logfile << "fp8 flops : " << (double)fp8_count << "\n";
+        return;
     }
 };
 

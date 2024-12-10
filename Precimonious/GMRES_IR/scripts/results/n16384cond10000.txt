@@ -1,0 +1,63 @@
+eps_prime : 0.01
+Cholesky flops : 
+double flops : 9.82636e+10
+float flops : 4.82907e+09
+half flops : 0
+bfloat flops : 0
+fp8 flops : 2.66658e+12
+number of iterations for precond_CG : 90
+CG flops : 
+double flops : 8.90108e+11
+float flops : 0
+half flops : 0
+bfloat flops : 0
+fp8 flops : 0
+number of iterations for vanilla_CG : 1657
+vanilla Cholesky flops : 
+double flops : 1.46593e+12
+float flops : 0
+half flops : 0
+bfloat flops : 0
+fp8 flops : 0
+eps_prime : 0.001
+Cholesky flops : 
+double flops : 3.705e+10
+float flops : 4.82907e+09
+half flops : 1.00338e+12
+bfloat flops : 0
+fp8 flops : 9.16279e+11
+number of iterations for precond_CG : 33
+CG flops : 
+double flops : 8.91719e+11
+float flops : 0
+half flops : 0
+bfloat flops : 0
+fp8 flops : 0
+number of iterations for vanilla_CG : 1660
+vanilla Cholesky flops : 
+double flops : 1.46593e+12
+float flops : 0
+half flops : 0
+bfloat flops : 0
+fp8 flops : 0
+eps_prime : 0.0001
+Cholesky flops : 
+double flops : 9.12803e+09
+float flops : 1.28223e+12
+half flops : 1.65688e+11
+bfloat flops : 0
+fp8 flops : 3.72782e+10
+number of iterations for precond_CG : 7
+CG flops : 
+double flops : 8.92793e+11
+float flops : 0
+half flops : 0
+bfloat flops : 0
+fp8 flops : 0
+number of iterations for vanilla_CG : 1662
+vanilla Cholesky flops : 
+double flops : 1.46593e+12
+float flops : 0
+half flops : 0
+bfloat flops : 0
+fp8 flops : 0

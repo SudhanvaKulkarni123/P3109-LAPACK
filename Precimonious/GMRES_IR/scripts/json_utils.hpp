@@ -1,8 +1,9 @@
 
 enum class factorization_type { standard_LU, two_prec_LU, three_prec_LU, low_prec_store_LU, scaled_two_prec_store_LU, block_low_prec_LU};
 enum class pivoting_scheme { partial, complete, none};
+enum class chol_mod { NONE, GMW81, SE90, SE99};
 
-int set_matrix_params(int& n, float& cond, bool& is_symmetric, bool& diag_dom, nlohmann::json& outer_settings)
+int set_matrix_params(int& n, float& cond, bool& is_symmetric, bool& diag_dom, float& work_factor, nlohmann::json& outer_settings)
 {
 
     string tmp;
@@ -23,13 +24,18 @@ int set_matrix_params(int& n, float& cond, bool& is_symmetric, bool& diag_dom, n
     tmp = tmp.substr(1, tmp.size() - 2);
     diag_dom = (tmp == "true");
 
+    tmp = settings["work_factor"].dump();
+    tmp = tmp.substr(1, tmp.size() - 2);
+    work_factor = stof(tmp);
+
+
     if(diag_dom) cout << "it is true\n";
 
     return 0;
 
 }
 
-int set_factorization_params(factorization_type& fact_type, string& lowest_prec, string& highest_prec, bool& is_rank_revealing,  pivoting_scheme& pivoting_scheme, int& num_precisions, int& block_size, bool& use_microscal, int& stopping_pos, double& switching_val, double& scaling_factor, double& tolerance, float& dropping_prob, nlohmann::json& outer_settings) 
+int set_factorization_params(factorization_type& fact_type, chol_mod& mod_type, string& lowest_prec, string& highest_prec, bool& is_rank_revealing,  pivoting_scheme& pivoting_scheme, int& num_precisions, int& block_size, bool& use_microscal, int& stopping_pos, double& switching_val, double& scaling_factor, double& tolerance, float& dropping_prob, nlohmann::json& outer_settings) 
 {
     string tmp;
     auto settings = outer_settings["factorization settings"];
@@ -41,6 +47,13 @@ int set_factorization_params(factorization_type& fact_type, string& lowest_prec,
     else if(tmp == "scaled_two_prec_store") fact_type = factorization_type::scaled_two_prec_store_LU;
     else if(tmp == "block_low_prec") fact_type = factorization_type::block_low_prec_LU;
     else fact_type = factorization_type::standard_LU;
+
+    tmp = settings["chol mod"].dump();
+    tmp = tmp.substr(1, tmp.size() - 2);
+    if(tmp == "GMW81") mod_type = chol_mod::GMW81;
+    else if(tmp == "SE90") mod_type = chol_mod::SE90;
+    else if(tmp == "SE99") mod_type = chol_mod::SE99;
+    else mod_type = chol_mod::NONE;
 
     tmp = settings["lowest precision"].dump();
     tmp = tmp.substr(1, tmp.size() - 2);

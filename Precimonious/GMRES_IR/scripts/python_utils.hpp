@@ -13,6 +13,14 @@ std::vector<T> convertPythonListToVector(std::vector<T>& vec,PyObject* pyList) {
     return vec;
 }
 
+
+template<typename T, typename matrix_t>
+int construct_no_py(int n, float cond, matrix_t& A) {
+
+    
+
+}
+
 template<typename T, typename matrix_t>
 int constructMatrix(int n, float cond, int space, bool geom, matrix_t& A, int p, bool is_symmetric, bool is_diag_dom, float& true_cond) {
     //this is an ambitious function that uses a Python embedding to call the functions found in generate\ copy.py to fill in the entries of A

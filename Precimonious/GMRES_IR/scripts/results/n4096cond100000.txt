@@ -1,0 +1,21 @@
+eps_prime : 0.01
+Cholesky flops : 
+double flops : 1.53279e+11
+float flops : 5.67637e+08
+half flops : 0
+bfloat flops : 0
+fp8 flops : 4.47448e+10
+number of iterations for precond_CG : 2281
+CG flops : 
+double flops : 1.75464e+11
+float flops : 0
+half flops : 0
+bfloat flops : 0
+fp8 flops : 0
+number of iterations for vanilla_CG : 5223
+vanilla Cholesky flops : 
+double flops : 2.29009e+10
+float flops : 0
+half flops : 0
+bfloat flops : 0
+fp8 flops : 0
