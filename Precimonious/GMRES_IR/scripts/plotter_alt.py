@@ -70,39 +70,35 @@ def plot_ratio(flops_data, alphas, filename):
     plt.figure(figsize=(8,6))
 
     for eps_prime in sorted(flops_data.keys()):
-        ratios = []
+        total_work_vanilla_cholesky = []
+        total_work_cg = []
+        total_work_cholesky = []
+
         for alpha in alphas:
             method_flops = flops_data[eps_prime]
 
-            # Compute total work for each component
-            cholesky_work = compute_total_work(method_flops['Cholesky'], alpha)
-            cg_work = compute_total_work(method_flops['CG'], alpha)
-            vanilla_cholesky_work = compute_total_work(method_flops['vanilla_Cholesky'], alpha)
+            # Compute total work for each method
+            total_work_cholesky.append(compute_total_work(method_flops['Cholesky'], alpha))
+            total_work_cg.append(compute_total_work(method_flops['CG'], alpha))
+            total_work_vanilla_cholesky.append(compute_total_work(method_flops['vanilla_Cholesky'], alpha))
 
+        # Plot total work for each method
+        plt.plot(alphas, total_work_cholesky, marker='o', label=f'Cholesky (eps_prime={eps_prime})')
 
-
-
-            # Compute min(vanilla Cholesky, vanilla CG)
-            min_vanilla_work = min(vanilla_cholesky_work, cg_work)
-
-            
-            # Compute the ratio
-            denominator = cholesky_work
-            ratio = min_vanilla_work / denominator if denominator != 0 else np.nan
-            ratios.append(ratio)
-
-        plt.plot(alphas, ratios, marker='o', label=f'eps_prime = {eps_prime}')
+    plt.plot(alphas, total_work_cg, marker='x', label=f'CG')
+    plt.plot(alphas, total_work_vanilla_cholesky, marker='s', label=f'Vanilla Cholesky')
 
     plt.xlabel('Alpha')
-    plt.ylabel('(min(vanilla Cholesky, vanilla CG) / (preconditioned CG + Cholesky))')
-    plt.title('Ratio of Total Work (weighted FLOPs) vs Alpha for Different eps_prime Values')
+    plt.yscale('log')
+    plt.ylabel('Total Work (weighted FLOPs)')
+    plt.title('Total Work (weighted FLOPs) vs Alpha for Different eps_prime Values')
     plt.legend()
     plt.grid(True)
 
     # Save the plot to a file
     os.makedirs('results', exist_ok=True)
     base_filename = os.path.splitext(os.path.basename(filename))[0]
-    plot_filename = f"results/plot-{base_filename}.png"
+    plot_filename = f"results/alt-plot-{base_filename}.png"
     plt.savefig(plot_filename)
     print(f"Plot saved as {plot_filename}")
 
@@ -112,7 +108,7 @@ def plot_ratio(flops_data, alphas, filename):
 if __name__ == '__main__':
     print("Current working directory:", os.getcwd())
 
-    filename = 'results/n1024cond1000.txt'  # Replace with your actual filename
+    filename = 'results/n16384cond10000.txt'  # Replace with your actual filename
     flops_data = parse_flops(filename)
     alphas = np.linspace(1, 5, 40)  # Adjust the range and number of alpha values as needed
     plot_ratio(flops_data, alphas, filename)

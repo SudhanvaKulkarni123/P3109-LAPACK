@@ -1,4 +1,4 @@
-/// This file computes the sol of Ax = b with a preconditioned CG (preconditioned with a switching precision Cholesky)
+// This file computes the sol of Ax = b with a preconditioned CG (preconditioned with a switching precision Cholesky)
 ///  @author Sudhanva Kulkarni
 
 #define PY_SSIZE_T_CLEAN
@@ -53,7 +53,7 @@ std::ofstream other_file("e5m2_error_e_cond.csv");
 std::ofstream timefile("time.txt");
 
 template <typename F0, typename F1, typename T2, typename T3, typename T4, typename T5, typename T6>
-double CG_IR(int n, double scale, float cond, factorization_type fact_type, double switching_val, double tolerance, double conv_thresh, float work_factor, bool is_symmetric, bool diag_dom, float dropping_prob, chol_mod chol_modif, int prec, int variant = 0, int num_iter_1 = 0, int num_total_iter = 5, kernel_type precond_mode = kernel_type::LEFT_LU, int max_CG_iter = 20, int inner_num_gmres_iter = 20, int num_IR_iter = 20, refinement_type method = refinement_type::CG_IR, int block_size = 128, int stopping_pos = 99999)
+double FGMRES_IR(int n, double scale, float cond, factorization_type fact_type, double switching_val, double tol, double conv_thresh, float work_factor, bool is_symmetric, bool diag_dom, float dropping_prob, chol_mod chol_modif, int prec, int variant = 0, int num_iter_1 = 0, int num_total_iter = 5, kernel_type precond_mode = kernel_type::LEFT_LU, int max_CG_iter = 20, int inner_num_gmres_iter = 20, int num_IR_iter = 20, refinement_type method = refinement_type::CG_IR, int block_size = 128, int stopping_pos = 99999)
 {
 
     using real_t = tlapack::real_type<ml_dtypes::float8_ieee_p<4>>;
@@ -303,7 +303,7 @@ double CG_IR(int n, double scale, float cond, factorization_type fact_type, doub
 
 
 
-    int info = pivoted_cholesky(LL, left_piv, right_piv, chol_modif, mixed_fact_flops ,block_size, tolerance, dropping_prob);
+    int info = pivoted_cholesky(LL, left_piv, right_piv, chol_modif, mixed_fact_flops ,block_size, tol, dropping_prob);
     cout << "make high prec copy after cholesky \n";
 
     tlapack::lacpy(tlapack::GENERAL, LL, LL_copy);
@@ -396,323 +396,292 @@ double CG_IR(int n, double scale, float cond, factorization_type fact_type, doub
     
 
     double nrmb = tlapack::nrm2(b);
-    
 
-    
-    // Initialize CG iteration counter
-    int count = 0;
-    
+    // Parameters for FGMRES
+    int max_iter = 1000;     // adjust as needed
+    int restart = std::min(n, 50); // typical restart length, can adjust
+    double tolerance = d_conv_bound; // using d_conv_bound as convergence tolerance
 
-    // Allocate necessary vectors
-    std::vector<double> z(n); // Preconditioned vector
-    std::vector<double> p(n); // Search direction
-    std::vector<double> temp_p(n);
-    std::vector<double> Ap(n); // A * p
+    // Setup for FGMRES
+    // We'll construct a Flexible GMRES that uses the same Cholesky-based preconditioner as in the CG code.
+    // No helper function: all preconditioning steps done inline.
 
-    norm_x = inf_norm(x);
-
-    // Compute initial preconditioned residual z = M^{-1} * r
-    // Preconditioning steps:
-    // 1. Scale by D
-    for(int i = 0; i < n; i++) {
-        z[i] = r[i] * D[i];
-    }
-    mixed_prec_flops.add_double_flops(n);
-    
-    // 2. Apply left permutation (P^T)
-    for (int i = 0; i < n; i++) {
-        auto tmp = z[left_piv[i]];
-        z[left_piv[i]] = z[i];
-        z[i] = tmp;
-    }
-    
-    // 3. Solve L y = P^T D r
-    tlapack::trsv(tlapack::LOWER_TRIANGLE, tlapack::NO_TRANS, tlapack::Diag::NonUnit, LL_copy, z);
-    mixed_prec_flops.add_double_flops(n*n);
-    
-    // 4. Solve L^T y = y
-    tlapack::trsv(tlapack::LOWER_TRIANGLE, tlapack::TRANSPOSE, tlapack::Diag::NonUnit, LL_copy, z);
-    mixed_prec_flops.add_double_flops(n*n);
-
-    // 5. Apply right permutation (P) to y
-    for (int i = n-1; i >= 0; i--) {
-        auto tmp = z[right_piv[i]];
-        z[right_piv[i]] = z[i];
-        z[i] = tmp;
-    }
-    
-    // 6. Scale by D again
-    for(int i = 0; i < n; i++) {
-        z[i] *= D[i];
-    }
-    mixed_prec_flops.add_double_flops(n);
-    
-    // Initialize search direction p = z
-    for(int i = 0; i < n; i++) {
-        p[i] = z[i];
-    }
-    
-    // Compute initial rz = r^T z
-    double rz = 0.0;
-    for(int i = 0; i < n; i++) {
-        rz += r[i] * z[i];
-    }
-    mixed_prec_flops.add_double_flops(n);
-
-    int p_iter = 0;
-    // Start CG iterations
-    for (int j = 0; j < max_CG_iter; j++) {
-        // Compute Ap = A * p
-        tlapack::gemv(tlapack::NO_TRANS, 1.0, FG, p, 0.0, Ap);
-        mixed_prec_flops.add_double_flops(2*n*n);
-        
-        // Compute p^T Ap
-        double pAp = 0.0;
-        for(int i = 0; i < n; i++) {
-            pAp += p[i] * Ap[i];
-        }
-        mixed_prec_flops.add_double_flops(2*n);
-        
-        // Check for division by zero
-        if(pAp == 0.0) {
-            std::cerr << "Division by zero encountered in alpha computation." << std::endl;
-            break;
-        }
-        
-        // Compute alpha = (r^T z) / (p^T Ap)
-        double alpha = rz / pAp;
-        mixed_prec_flops.add_double_flops(1);
-        
-        // Update x = x + alpha * p
-        for(int i = 0; i < n; i++) {
-            x[i] += alpha * p[i];
-        }
-        mixed_prec_flops.add_double_flops(n);
-        
-        // Update r = r - alpha * Ap
-        for(int i = 0; i < n; i++) {
-            r[i] -= alpha * Ap[i];
-        }
-        mixed_prec_flops.add_double_flops(n);
-        
-        // Compute norm of residual
-        double inf_norm_r = inf_norm(r);
-        double scaled_residual = inf_norm_r / (normA * inf_norm(x));
-        mixed_prec_flops.add_double_flops(2*n + 1);
-        
-        // Log the residual
-        myfile << j << "," << scaled_residual << std::endl;
-        
-        // Check for convergence
-        if (scaled_residual < d_conv_bound) {
-            p_iter = j+1;
-            std::cout << "Converged to desired precision in " << j + 1 << " iterations." << std::endl;
-            break;
-        }
-        
-        // Precondition the new residual z = M^{-1} * r
-        // 1. Scale by D
-        for(int i = 0; i < n; i++) {
-            z[i] = r[i] * D[i];
-        }
-        mixed_prec_flops.add_double_flops(n);
-        
-        // 2. Apply left permutation (P^T)
-        for (int i = 0; i < n; i++) {
-            auto tmp = z[left_piv[i]];
-            z[left_piv[i]] = z[i];
-            z[i] = tmp;
-        }
-        
-        // 3. Solve L y = P^T D r
-        tlapack::trsv(tlapack::LOWER_TRIANGLE, tlapack::NO_TRANS, tlapack::Diag::NonUnit, LL_copy, z);
-        mixed_prec_flops.add_double_flops(n*n);
-        
-        // 4. Solve L^T y = y
-        tlapack::trsv(tlapack::LOWER_TRIANGLE, tlapack::TRANSPOSE, tlapack::Diag::NonUnit, LL_copy, z);
-        mixed_prec_flops.add_double_flops(n*n);
-        
-        // 5. Apply right permutation (P) to y
-        for (int i = n-1; i >= 0; i--) {
-            auto tmp = z[right_piv[i]];
-            z[right_piv[i]] = z[i];
-            z[i] = tmp;
-        }
-        
-        // 6. Scale by D again
-        for(int i = 0; i < n; i++) {
-            z[i] *= D[i];
-        }
-        mixed_prec_flops.add_double_flops(n);
-        
-        // Compute new rz_new = r^T z_new
-        double rz_new = 0.0;
-        for(int i = 0; i < n; i++) {
-            rz_new += r[i] * z[i];
-        }
-        mixed_prec_flops.add_double_flops(2*n);
-        
-        // Compute beta = rz_new / rz
-        double beta = rz_new / rz;
-        mixed_prec_flops.add_double_flops(1);
-        
-        // Update search direction p = z_new + beta * p
-        for(int i = 0; i < n; i++) {
-            p[i] = z[i] + beta * p[i];
-        }
-        mixed_prec_flops.add_double_flops(n);
-        
-        // Update rz for the next iteration
-        rz = rz_new;
-        
-        // Increment iteration counter
-        count++;
-    }
-    
-
-    
-
-    // Final residual computation: r = b - A * x
+    // Initial residual: r = b - A*x
+    // (x is currently our initial guess)
     for (int i = 0; i < n; i++)
         r[i] = b[i];
     tlapack::gemv(tlapack::NO_TRANS, -1.0, FG, x, 1.0, r);
     mixed_prec_flops.add_double_flops(2*n*n);
-    
-    // Compute final backward error
+    double beta = inf_norm(r);
+
+    if (beta < 1e-15) {
+        std::cout << "Initial guess sufficiently good." << std::endl;
+        // Already converged
+        // If needed, compute final residual/backward error:
+        // r = b - A*x
+        for (int i = 0; i < n; i++) r[i] = b[i];
+        tlapack::gemv(tlapack::NO_TRANS, -1.0, FG, x, 1.0, r);
+        double final_inf_norm_r = inf_norm(r);
+        double final_backward_error = final_inf_norm_r / (inf_norm(x)*normA);
+        std::cout << "Final backward error: " << final_backward_error << std::endl;
+        std::cout << "Norm of x is: " << inf_norm(x) << std::endl;
+        return 0.0; // or just return if this is main code section
+    }
+
+    // GMRES data structures
+    std::vector<double> V_((restart+1) * n, 0.0);
+    tlapack::LegacyMatrix<double, idx_t> V(restart+1, n, V_.data(), n);
+
+    std::vector<double> Z_((restart+1) * n, 0.0);
+    tlapack::LegacyMatrix<double, idx_t> Z(restart+1, n, Z_.data(), n);
+
+    std::vector<double> H_((restart+1) * restart, 0.0);
+    tlapack::LegacyMatrix<double, idx_t> H(restart+1, restart, H_.data(), restart);
+    std::vector<double> cs(restart,0.0), sn(restart,0.0);
+    std::vector<double> g(restart+1,0.0);
+    g[0] = beta;
+
+    // V[0] = r / beta
+    for (int i = 0; i < n; i++) {
+        V(0,i) = r[i] / beta;
+    }
+    mixed_prec_flops.add_double_flops(n);
+
+    int total_iter = 0;
+    bool converged = false;
+
+    // FGMRES Outer loop (for restarts)
+    for (int outer = 0; outer < (max_iter/restart) && !converged; outer++) {
+        // Inner iteration
+        for (int j = 0; j < restart && total_iter < max_iter; j++) {
+            total_iter++;
+
+            // FLEXIBLE PART: Apply preconditioner to V[j]
+            // Preconditioner M^{-1}:
+            // Steps as in CG code:
+            // z = V[j]
+            for (int i = 0; i < n; i++) {
+                Z(j,i) = V(j,i);
+            }
+
+            // 1. Scale by D
+            for (int i = 0; i < n; i++) {
+                Z(j,i)= Z(j,i) * D[i];
+            }
+            mixed_prec_flops.add_double_flops(n);
+
+            // 2. Apply left permutation (P^T)
+            for (int i = 0; i < n; i++) {
+                double tmp = Z(j, left_piv[i]);
+                Z(j,left_piv[i]) = Z(j,i);
+                Z(j,i) = tmp;
+            }
+
+            auto Z_j = tlapack::row(Z, j);
+            // 3. Solve L y = P^T D v_j
+            tlapack::trsv(tlapack::LOWER_TRIANGLE, tlapack::NO_TRANS, tlapack::Diag::NonUnit, LL_copy, Z_j);
+            mixed_prec_flops.add_double_flops(n*n);
+
+            // 4. Solve L^T y = y
+            tlapack::trsv(tlapack::LOWER_TRIANGLE, tlapack::TRANSPOSE, tlapack::Diag::NonUnit, LL_copy, Z_j);
+            mixed_prec_flops.add_double_flops(n*n);
+
+            // 5. Apply right permutation (P)
+            for (int i = n-1; i >= 0; i--) {
+                double tmp = Z(j,right_piv[i]);
+                Z(j,right_piv[i]) = Z(j,i);
+                Z(j,i) = tmp;
+            }
+
+            // 6. Scale by D again
+            for (int i = 0; i < n; i++) {
+                Z(j,i) = Z(j,i)*D[i];
+            }
+            mixed_prec_flops.add_double_flops(n);
+
+            // w = A * Z[j]
+            std::vector<double> w(n,0.0);
+            tlapack::gemv(tlapack::NO_TRANS, 1.0, FG, Z_j, 0.0, w);
+            mixed_prec_flops.add_double_flops(2*n*n);
+
+            // Arnoldi process
+            for (int i = 0; i <= j; i++) {
+                double dot_val = 0.0;
+                for (int k = 0; k < n; k++) {
+                    dot_val += V(i,k)*w[k];
+                }
+                mixed_prec_flops.add_double_flops(2*n);
+                H(i,j) = dot_val;
+
+                for (int k = 0; k < n; k++) {
+                    w[k] -= H(i,j)*V(i,k);
+                }
+                mixed_prec_flops.add_double_flops(n);
+            }
+
+            // Compute norm of w
+            double normw = 0.0;
+            for (int k = 0; k < n; k++) {
+                double val = std::fabs(w[k]);
+                if (val > normw) normw = val;
+            }
+
+            if (normw < 1e-15) {
+                // Breakdown
+                H(j+1,j) = 0.0;
+                for (int k = 0; k < n; k++)
+                    V(j+1,k) = 0.0;
+            } else {
+                H(j+1,j) = normw;
+                double inv_normw = 1.0/normw;
+                for (int k = 0; k < n; k++) {
+                    V(j+1,k) = w[k]*inv_normw;
+                }
+                mixed_prec_flops.add_double_flops(n);
+            }
+
+            // Apply Givens rotations
+            for (int i = 0; i < j; i++) {
+                double temp = cs[i]*H(i,j) + sn[i]*H(i+1,j);
+                H(i+1,j) = -sn[i]*H(i,j) + cs[i]*H(i+1,j);
+                H(i,j) = temp;
+                mixed_prec_flops.add_double_flops(6);
+            }
+
+            // Generate Givens rotation for H(i,j) and H(j+1,j)
+            double h_jj = H(j,j);
+            double h_j1j = H(j+1,j);
+            double denom = std::sqrt(h_jj*h_jj + h_j1j*h_j1j);
+            cs[j] = h_jj/denom;
+            sn[j] = h_j1j/denom;
+            H(j,j) = cs[j]*H(j,j) + sn[j]*H(j+1,j);
+            H(j+1,j) = 0.0;
+            mixed_prec_flops.add_double_flops(5);
+
+            // Update g
+            double temp_g = cs[j]*g[j] + sn[j]*g[j+1];
+            g[j+1] = -sn[j]*g[j] + cs[j]*g[j+1];
+            g[j] = temp_g;
+            mixed_prec_flops.add_double_flops(4);
+
+            // Check convergence
+            double res = std::fabs(g[j+1]);
+            // Compute scaled residual: res / (normA * inf_norm(x))
+            // We don't have updated x yet, let's estimate or use initial norm_x if x not updated yet.
+            // At this point in GMRES, we haven't solved for x. The standard GMRES criterion:
+            double scaled_residual = res / (normA * (inf_norm(x) + 1e-15));
+            
+            // Log residual
+            myfile << total_iter << "," << scaled_residual << std::endl;
+
+            if (scaled_residual < tolerance) {
+                // Solve least squares problem: back substitution in H and g
+                std::vector<double> y(j+1,0.0);
+                for (int i = j; i >= 0; i--) {
+                    double sum = g[i];
+                    for (int k = i+1; k <= j; k++) {
+                        sum -= H(i,k)*y[k];
+                    }
+                    y[i] = sum/H(i,i);
+                    mixed_prec_flops.add_double_flops(2*(j-i)+1);
+                }
+
+                // x = x + Z[0..j]*y
+                for (int k = 0; k < n; k++) {
+                    for (int i = 0; i <= j; i++) {
+                        x[k] += Z(i,k)*y[i];
+                    }
+                    mixed_prec_flops.add_double_flops(2*(j+1));
+                }
+
+                std::cout << "Converged in " << total_iter << " iterations." << std::endl;
+                converged = true;
+                break;
+            }
+
+            // If we reached restart limit, do restart
+            if (j == restart-1) {
+                // Solve least squares problem at the end of this cycle
+                std::vector<double> y(j+1,0.0);
+                for (int i = j; i >= 0; i--) {
+                    double sum = g[i];
+                    for (int k = i+1; k <= j; k++) {
+                        sum -= H(i,k)*y[k];
+                    }
+                    y[i] = sum/H(i,i);
+                    mixed_prec_flops.add_double_flops(2*(j-i)+1);
+                }
+
+                // Update x
+                for (int kk = 0; kk < n; kk++) {
+                    for (int i = 0; i <= j; i++) {
+                        x[kk] += Z(i, kk) * y[i];
+                    }
+                    mixed_prec_flops.add_double_flops(2*(j+1));
+                }
+
+                // Compute new residual: r = b - A*x
+                for (int i = 0; i < n; i++) r[i] = b[i];
+                tlapack::gemv(tlapack::NO_TRANS, -1.0, FG, x, 1.0, r);
+                mixed_prec_flops.add_double_flops(2*n*n);
+                beta = inf_norm(r);
+                if (beta < tolerance*normA*inf_norm(x)) {
+                    std::cout << "Converged after restart in " << total_iter << " iterations." << std::endl;
+                    converged = true;
+                    break;
+                }
+
+                // Restart
+                for (int i = 0; i < n; i++) {
+                    V(0,i) = r[i]/beta;
+                }
+                mixed_prec_flops.add_double_flops(n);
+                std::fill(g.begin(), g.end(), 0.0);
+                g[0] = beta;
+
+                // Instead of using nrows(H) and ncols(H), we know H is (restart+1)-by-(restart).
+                for (int iH = 0; iH < restart+1; iH++) {
+                    for (int jH = 0; jH < restart; jH++) {
+                        H(iH,jH) = 0.0;
+                    }
+                }
+
+                std::fill(cs.begin(), cs.end(), 0.0);
+                std::fill(sn.begin(), sn.end(), 0.0);
+            }
+
+        } // end inner iteration
+    } // end outer iteration
+
+    // Final residual computation: r = b - A*x
+    for (int i = 0; i < n; i++)
+        r[i] = b[i];
+    tlapack::gemv(tlapack::NO_TRANS, -1.0, FG, x, 1.0, r);
+    mixed_prec_flops.add_double_flops(2*n*n);
+
     double final_inf_norm_r = inf_norm(r);
-    double final_backward_error = final_inf_norm_r / (inf_norm(x) * normA);
+    double final_backward_error = final_inf_norm_r / (inf_norm(x)*normA);
     std::cout << "Final backward error: " << final_backward_error << std::endl;
-    
-    // Compute forward error if exact solution bd is known
-        std::vector<double> error(n, 0.0);
-        // for(int i = 0; i < n; i++) {
-        //     error[i] = x[i] - bd[i];
-        // }
-        // double forward_error = inf_norm(error) / inf_norm(bd);
-        // std::cout << "Forward error is: " << forward_error << std::endl;
-    
-    
-    // Optional: Compute norm of x
     std::cout << "Norm of x is: " << inf_norm(x) << std::endl;
 
 
-
-    //now solve the same problem with non preconditioned CG and compare convergence
-    std::cout << "======================================================================\n";
-    std::cout << "now running standard CG : \n";
-
-    for(int i = 0; i < n; i++) x[i] = 0.0;
-    for(int i = 0; i < n; i++) {
-        r[i] = b[i];
-        p[i] = r[i];
-    }
-
-    bool convd = false;
-    int v_iters = 0;
-
-    reg_flops.add_double_flops(4*n);
-    double r_norm = tlapack::dot(r, r);
-    double b_norm = tlapack::dot(b, b);
-
-       for (int iter = 1; iter <= max_CG_iter; ++iter) {
-        // Compute Ap = A * p
-        tlapack::gemv(tlapack::NO_TRANS, 1.0, FG, p, 0.0, Ap);
-        reg_flops.add_double_flops(2*n*n);
-
-        // Compute alpha = (r^T r) / (p^T Ap)
-        double pAp = tlapack::dot(p, Ap);
-        reg_flops.add_double_flops(2*n);
-        if (pAp == 0.0) {
-            std::cerr << "Encountered zero denominator in alpha computation." << std::endl;
-            break;
-        }
-        double alpha = r_norm / pAp;
-        reg_flops.add_double_flops(1);
-
-        // Update x = x + alpha * p
-        tlapack::axpy(alpha, p, x);
-        reg_flops.add_double_flops(n);
-
-        // Update r = r - alpha * Ap
-        tlapack::axpy(-alpha, Ap, r);
-        reg_flops.add_double_flops(2*n);
-
-        // Compute new residual norm
-        double r_norm_new = tlapack::dot(r, r);
-        reg_flops.add_double_flops(2*n);
-
-        // Check for convergence
-        double rel_residual = std::sqrt(r_norm_new / b_norm);
-        reg_flops.add_double_flops(2);
-        other_file << iter << "," << rel_residual << std::endl;
-
-        if (rel_residual < d_conv_bound) {
-            v_iters = iter;
-            std::cout << "Converged to double in " << iter << " iterations." << std::endl;
-            break;
-        }
-
-        // Compute beta = (r_new^T r_new) / (r_old^T r_old)
-        double beta = r_norm_new / r_norm;
-        reg_flops.add_double_flops(1);
-
-        // Update search direction p = r + beta * p
-        for (int i = 0; i < n; ++i) {
-            p[i] = r[i] + beta * p[i];
-        }
-        reg_flops.add_double_flops(2*n);
-
-        // Prepare for next iteration
-        r_norm = r_norm_new;
-    }
-
-
-
-    
-    cout << "flops for no preconditioner CG : \n";
-    reg_flops.print_stats();
-    cout << "flops for Cholesky : \n";
-    mixed_fact_flops.print_stats();
     std::cout << " total effective work for mixed Cholesky (normalized to fp8): \n";
     std::cout << mixed_fact_flops.report_total() << std::endl;
     cout << "flops for CG with precond : \n";
     mixed_prec_flops.print_stats();
     std::cout << " total effective work for precond CG (normalized to fp8): \n";
     std::cout << mixed_prec_flops.report_total() << std::endl;
-    cout << "flops for fp64 Cholesky : \n";
-    cholesky_flops.print_stats();
 
-
-    
-
-    cout << " improvement in number of flops is : \n";
-    std::vector<n_flops> Cholesky_flops = {mixed_fact_flops, mixed_prec_flops};
-    cout << 1.0/reg_flops.compare_with(Cholesky_flops) << "\n";
-
-    std::cout << "logging results...... \n";
-
-    string new_file = "results/n" + std::to_string(n) + "cond" + std::to_string((int)cond) + ".txt";
-
-    std::ofstream newfile;
-
-
-    newfile.open(new_file, std::ios::app);
-
-    newfile << "eps_prime : " << tolerance << "\n";
-    newfile << "Cholesky flops : \n";
-    n_flops::log_all(newfile, Cholesky_flops);
-    newfile << "number of iterations for precond_CG : " << p_iter << "\n";
-    newfile << "CG flops : \n";
-    reg_flops.log_results(newfile);
-    newfile << "number of iterations for vanilla_CG : " << v_iters << "\n";
-    newfile << "vanilla Cholesky flops : \n";
-    cholesky_flops.log_results(newfile);
-
-    newfile.close();
-
-    
     return final_backward_error;
+
+    
+
+    
+
 }
+
+
+
 
 int main(int argc, char **argv)
 {
@@ -756,7 +725,7 @@ int main(int argc, char **argv)
     std::cout << "set refinement params" << std::endl;
 
     std::cout << "beginning factorization" << std::endl;
-    er3 += CG_IR<ml_dtypes::float8_ieee_p<6>, Eigen::half, double, double, double, double, double>(n, scaling_factor, static_cast<float>(cond), fact_type, switching_val, tolerance, conv_thresh, work_factor, is_symmetric, diag_dom, dropping_prob, chol_modif, 999, 0, num_iter_1, total_num_iter, precond_kernel, max_gmres_iter, inner_gmres_num, num_IR_iter, refinement_method, block_size, stopping_pos);
+    er3 += FGMRES_IR<ml_dtypes::float8_ieee_p<6>, Eigen::half, double, double, double, double, double>(n, scaling_factor, static_cast<float>(cond), fact_type, switching_val, tolerance, conv_thresh, work_factor, is_symmetric, diag_dom, dropping_prob, chol_modif, 999, 0, num_iter_1, total_num_iter, precond_kernel, max_gmres_iter, inner_gmres_num, num_IR_iter, refinement_method, block_size, stopping_pos);
 
     bool verified = abs(er3) < 1e-8;
     FILE *fp = fopen("./log.txt", "w");

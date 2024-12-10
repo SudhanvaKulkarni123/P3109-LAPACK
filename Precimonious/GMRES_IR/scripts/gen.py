@@ -122,6 +122,8 @@ def init_matrix(dim1, dim2, cond, is_geom,is_symmetric, is_diag_dom, lst):
         for j in range(n):
             A[i,j] = find_closest_value(A[i,j], a_values)       ##rounds to desired precision
 
+    # D = np.diag([2 ** np.random.randint(-10, 11) for _ in range(dim1)])
+    # A = np.matmul(np.matmul(D, A), D)
     return A
 
 
@@ -216,6 +218,7 @@ def LU_gen(n1,cond,m, mode, p, is_symmetric, is_diag_dom):
     random.seed(10)
     if p == 999:
         A = init_matrix(n1, n1, cond, mode, is_symmetric, is_diag_dom ,[1.0])
+        
         A = A
         to_ret = A.flatten('F').tolist()[0]
         if not is_symmetric:
@@ -224,7 +227,7 @@ def LU_gen(n1,cond,m, mode, p, is_symmetric, is_diag_dom):
         else :
             diag_A = np.diag(A)
             diag_A = np.sqrt(diag_A)
-            to_ret.append(np.linalg.cond(A))
+            to_ret.append(cond)
         return to_ret
     a_values = set_vals(p)
     A_orig = init_matrix(n1, n1, cond, mode, a_values)

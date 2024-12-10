@@ -8,10 +8,144 @@
 #include "tlapack/lapack/rscl.hpp"
 #include "tlapack/blas/gemv.hpp"
 #include "tlapack/plugins/legacyArray.hpp"
+#include <omp.h>
+
 
 
 int numU_to8 = 0;
 int numL_to8 = 0;
+
+template <typename Matrix>
+void add_matrix(const Matrix& A, const Matrix& B, Matrix& C)
+{
+    using idx_t = int;
+    idx_t n = A.size();
+    #pragma omp parallel for collapse(2)
+    for (idx_t i = 0; i < n; i++)
+        for (idx_t j = 0; j < n; j++)
+            C(i, j) = A(i, j) + B(i, j);
+
+    return;
+}
+
+// Matrix subtraction
+template <typename Matrix>
+void subtract_matrix(const Matrix& A, const Matrix& B, Matrix& C)
+{
+
+    using idx_t = int;
+    idx_t n = A.size();
+
+    #pragma omp parallel for collapse(2)
+    for (idx_t i = 0; i < n; i++)
+        for (idx_t j = 0; j < n; j++)
+            C(i, j) = A(i, j) - B(i, j);
+
+    return;
+}
+
+template <typename Matrix>
+void strassen_multiply(Matrix& A, Matrix& B, Matrix& C,
+                       Matrix& M, Matrix& tempA, Matrix& tempB, int threshold)
+{
+    using idx_t = tlapack::size_type<Matrix>;
+
+    idx_t n = nrows(A); // Assuming square matrices
+
+    if (n <= threshold)
+    {
+        // Standard multiplication
+        #pragma omp parallel for collapse(2)
+        for (idx_t i = 0; i < n; i++)
+            for (idx_t j = 0; j < n; j++)
+                for (idx_t k = 0; k < n; k++)
+                    C(i, j) += A(i, k) * B(k, j);
+        return;
+    }
+
+    idx_t newSize = n / 2;
+
+    // Create ranges for slicing
+    auto r0 = range(0, newSize);
+    auto r1 = range(newSize, n);
+
+    // Create slices for submatrices
+    auto A11 = slice(A, r0, r0);
+    auto A12 = slice(A, r0, r1);
+    auto A21 = slice(A, r1, r0);
+    auto A22 = slice(A, r1, r1);
+
+    auto B11 = slice(B, r0, r0);
+    auto B12 = slice(B, r0, r1);
+    auto B21 = slice(B, r1, r0);
+    auto B22 = slice(B, r1, r1);
+
+    auto C11 = slice(C, r0, r0);
+    auto C12 = slice(C, r0, r1);
+    auto C21 = slice(C, r1, r0);
+    auto C22 = slice(C, r1, r1);
+
+    // Slices for M and temporary matrices
+    auto M_sub = slice(M, r0, r0);
+    auto tempA_sub = slice(tempA, r0, r0);
+    auto tempB_sub = slice(tempB, r0, r0);
+
+    // Use OpenMP tasks for parallelism
+    #pragma omp parallel
+    {
+        #pragma omp single nowait
+        {
+            // Reuse M_sub for M1 to M7 sequentially
+            // M1 = (A11 + A22) * (B11 + B22)
+            add_matrix(A11, A22, tempA_sub);
+            add_matrix(B11, B22, tempB_sub);
+            #pragma omp task
+            strassen_multiply(tempA_sub, tempB_sub, M_sub, M_sub, tempA_sub, tempB_sub, threshold);
+
+            // M2 = (A21 + A22) * B11
+            add_matrix(A21, A22, tempA_sub);
+            #pragma omp task
+            strassen_multiply(tempA_sub, B11, tempB_sub, M_sub, tempA_sub, tempB_sub, threshold);
+
+            // M3 = A11 * (B12 - B22)
+            subtract_matrix(B12, B22, tempB_sub);
+            #pragma omp task
+            strassen_multiply(A11, tempB_sub, tempA_sub, M_sub, tempA_sub, tempB_sub, threshold);
+
+            // M4 = A22 * (B21 - B11)
+            subtract_matrix(B21, B11, tempB_sub);
+            #pragma omp task
+            strassen_multiply(A22, tempB_sub, C11, M_sub, tempA_sub, tempB_sub, threshold);
+
+            // M5 = (A11 + A12) * B22
+            add_matrix(A11, A12, tempA_sub);
+            #pragma omp task
+            strassen_multiply(tempA_sub, B22, C12, M_sub, tempA_sub, tempB_sub, threshold);
+
+            // M6 = (A21 - A11) * (B11 + B12)
+            subtract_matrix(A21, A11, tempA_sub);
+            add_matrix(B11, B12, tempB_sub);
+            #pragma omp task
+            strassen_multiply(tempA_sub, tempB_sub, C21, M_sub, tempA_sub, tempB_sub, threshold);
+
+            // M7 = (A12 - A22) * (B21 + B22)
+            subtract_matrix(A12, A22, tempA_sub);
+            add_matrix(B21, B22, tempB_sub);
+            #pragma omp task
+            strassen_multiply(tempA_sub, tempB_sub, C22, M_sub, tempA_sub, tempB_sub, threshold);
+
+            #pragma omp taskwait
+
+            // Combine results directly into C submatrices
+            // Note: Adjust the calculations as needed to account for the reuse of buffers
+            // Ensure that the buffers used in calculations are not overwritten prematurely
+        }
+    }
+
+    return;
+}
+
+
 
 /// @brief simple gemm
 template<TLAPACK_MATRIX matrixA_t, TLAPACK_MATRIX matrixB_t, TLAPACK_MATRIX matrixC_t, TLAPACK_SCALAR scal_t>
@@ -98,23 +232,28 @@ void block_gemm(matrixA_t& A, matrixA_t& B, matrixA_t& C, matrixB_t& A_dtype, ma
     // }
 
     //now scale A and B accordingly -- A is lower triangular, B upper
-    for (idx_t i = 0; i < m; i++)
+    #pragma omp parallel for 
+    for (idx_t j = 0; j < k; j++)
     {
-        for (idx_t j = 0; j < k; j++)
+        #pragma omp simd
+        for (idx_t i = 0; i < m; i++)
         {
             A_dtype(i, j) = static_cast<dtype>((A(i, j)/std::pow(2.0,max_exp_A1[i])));
         }
     }
 
-    for (idx_t i = 0; i < k; i++)
+    #pragma omp parallel for 
+    for (idx_t j = 0; j < n; j++)
     {
-        for (idx_t j = 0; j < n; j++)
+        #pragma omp simd
+        for (idx_t i = 0; i < k; i++)
         {
             B_dtype(i, j) = static_cast<dtype2>(B(i, j)/ std::pow(2.0,max_exp_B1[j]));
         }
     }
 
     //now perform the matmul as would be done in tensor cores
+    #pragma omp parallel for collapse(2) schedule(dynamic)
     for (idx_t ii = 0; ii < m; ii += block_size)
 {
     for (idx_t jj = 0; jj < n; jj += block_size)
@@ -126,6 +265,7 @@ void block_gemm(matrixA_t& A, matrixA_t& B, matrixA_t& C, matrixB_t& A_dtype, ma
                 for (idx_t j = jj; j < std::min(jj + block_size, n); j++)
                 {
                     float sum = 0;
+                    #pragma omp simd reduction(+:sum)
                     for (idx_t l = ll; l < std::min(ll + block_size, k); l++)
                     {
                     //     auto first_leftover = static_cast<dtype>(std::pow(2, 7) * 
@@ -362,18 +502,22 @@ void squeezing_matmul(matrixA_t& A, matrixA_t& B, matrixC_t& C, matrixB_t& A_dty
     float min_A = 999;
     float max_B = -999;
     float min_B = 999;
-    for (idx_t i = 0; i < m; i++)
+
+    #pragma omp parallel for reduction(max : max_A) collapse(2)
+    for (idx_t j = 0; j < k; j++)
     {
-        for (idx_t j = 0; j < k; j++)
+        for (idx_t i = 0; i < m; i++)
         {
             if ((A(i, j)) > max_A) max_A = (A(i, j));
         }
     }
 
     //find signed max and min in B
-    for (idx_t i = 0; i < k; i++)
+    #pragma omp parallel for reduction(max : max_B) collapse(2)
+    for (idx_t j = 0; j < n; j++)
     {
-        for (idx_t j = 0; j < n; j++)
+
+        for (idx_t i = 0; i < k; i++)
         {
             if ((B(i, j)) > max_B) max_B = (B(i, j));
         }
@@ -382,45 +526,44 @@ void squeezing_matmul(matrixA_t& A, matrixA_t& B, matrixC_t& C, matrixB_t& A_dty
     auto alpha1 = 1.0/max_A;
     auto alpha2 =  1.0/max_B;
 
-    cout << "alpha1 is : " << alpha1 << "\n";
-    cout << "alpha2 is : " << alpha2 << "\n";
-
     auto beta1 = 0.0;
     auto beta2 = 0.0;
 
     // squueze into A_dtype and B_dtype
-
-    std::vector<float> A_sums(m, 0);
-    for (idx_t i = 0; i < m; i++)
+    #pragma omp parallel for
+    for (idx_t j = 0; j < k; j++)
     {
-        for (idx_t j = 0; j < k; j++)
+        #pragma omp simd
+        for (idx_t i = 0; i < m; i++)
         {
             auto tmp = alpha1*A(i, j) + beta1;
-            if(tmp > (float)std::numeric_limits<dtype>::max()) tmp = (float)std::numeric_limits<dtype>::max();
             A_dtype(i, j) = static_cast<dtype>(tmp);
-            if(isinf(A_dtype(i,j))) std::cout << "encounterd infinity in A!" << std::endl;
+            
         }
     }
 
     std::vector<float> B_sums(n, 0);
 
-    for (idx_t i = 0; i < k; i++)
+    #pragma omp parallel for 
+    for (idx_t j = 0; j < n; j++)
     {
-        for (idx_t j = 0; j < n; j++)
+        #pragma omp simd
+        for (idx_t i = 0; i < k; i++)
         {
             auto tmp = alpha2*B(i, j) + beta2;
-            if(tmp > (float)std::numeric_limits<dtype>::max()) tmp = (float)std::numeric_limits<dtype>::max();
             B_dtype(i, j) = static_cast<dtype>(tmp);
-            if(isinf(B_dtype(i,j))) std::cout << "encounterd infinity in B!" << std::endl;
         }
     }
 
-    for (int ii = 0; ii < m; ii += block_size) {
+
+    #pragma omp parallel for collapse(2) schedule(dynamic)
     for (int jj = 0; jj < n; jj += block_size) {
+    for (int ii = 0; ii < m; ii += block_size) {
         for (int kk = 0; kk < k; kk += block_size) {
-            for (int i = ii; i < ii + block_size; i++) {
-                for (int j = jj; j < jj + block_size; j++) {
+            for (int j = jj; j < jj + block_size; j++) {
+                for (int i = ii; i < ii + block_size; i++)  {
                     float sum = 0;
+                    #pragma omp simd reduction(+:sum)
                     for (int l = kk; l < kk + block_size; l++) {
                         sum += (static_cast<float>(A_dtype(i, l)) * static_cast<float>(B_dtype(l, j)));
                     }
@@ -440,6 +583,195 @@ void squeezing_matmul(matrixA_t& A, matrixA_t& B, matrixC_t& C, matrixB_t& A_dty
     
 
     
+
+
+
+}
+
+
+template<TLAPACK_MATRIX matrixA_t, TLAPACK_MATRIX matrixB_t, TLAPACK_MATRIX matrixC_t>
+void squeezing_strassen(matrixA_t& A, matrixA_t& B, matrixC_t& C, matrixB_t& A_dtype, matrixB_t& B_dtype, matrixC_t& M, matrixC_t& tempA, matrixC_t& tempB, float z1, float z2, int block_size = 4)
+{
+    using idx_t = size_type<matrixA_t>;
+    using T = type_t<matrixA_t>;
+    using real_t = real_type<T>;
+    using V = type_t<matrixB_t>;
+    using dtype = real_type<V>;
+    using range = std::pair<idx_t, idx_t>;
+    const idx_t m = nrows(A);
+    const idx_t n = ncols(B);
+    const idx_t k = ncols(A);
+
+    //find signed max and min of A, B
+    float max_A = -999;
+    float min_A = 999;
+    float max_B = -999;
+    float min_B = 999;
+
+
+    #pragma omp parallel for reduction(max : max_A) collapse(2)
+    for (idx_t j = 0; j < k; j++)
+    {
+        for (idx_t i = 0; i < m; i++)
+        {
+            if ((A(i, j)) > max_A) max_A = (A(i, j));
+        }
+    }
+
+    //find signed max and min in B
+    #pragma omp parallel for reduction(max : max_B) collapse(2)
+    for (idx_t j = 0; j < n; j++)
+    {
+        for (idx_t i = 0; i < k; i++)
+        {
+            if ((B(i, j)) > max_B) max_B = (B(i, j));
+        }
+    }
+
+    auto alpha1 = 1.0/max_A;
+    auto alpha2 =  1.0/max_B;
+
+    auto beta1 = 0.0;
+    auto beta2 = 0.0;
+
+    // squueze into A_dtype and B_dtype
+    #pragma omp parallel for
+    for (idx_t j = 0; j < k; j++)
+    {
+        #pragma omp simd
+        for (idx_t i = 0; i < m; i++)
+        {
+            auto tmp = alpha1*A(i, j) + beta1;
+            A_dtype(i, j) = static_cast<dtype>(tmp);
+            
+        }
+    }
+
+    std::vector<float> B_sums(n, 0);
+    #pragma omp parallel for
+    for (idx_t j = 0; j < n; j++)
+    {
+        #pragma omp simd
+        for (idx_t i = 0; i < k; i++)
+        {
+            auto tmp = alpha2*B(i, j) + beta2;
+            B_dtype(i, j) = static_cast<dtype>(tmp);
+        }
+    }
+
+    strassen_multiply(A_dtype, B_dtype, C, M, tempA, tempB, (int)(block_size/4));
+
+    // Adjust the result and subtract from C
+    #pragma omp parallel for collapse(2)
+    for (idx_t i = 0; i < m; i++)
+    {
+        for (idx_t j = 0; j < n; j++)
+        {
+            float sum = C_pad(i, j) / (alpha1 * alpha2);
+            C(i, j) -= sum;
+        }
+    }
+
+
+
+
+
+
+
+}
+
+template<int p, typename matrixA_t, typename matrixB_t, typename matrixC_t>
+void diff_matmul(matrixA_t& A, matrixA_t& B, matrixC_t& C, matrixB_t& A_dtype, matrixB_t& B_dtype, float z1, float z2, int block_size = 4)
+{
+    using idx_t = size_type<matrixA_t>;
+    using T = type_t<matrixA_t>;
+    using real_t = real_type<T>;
+    using V = type_t<matrixB_t>;
+    using dtype = real_type<V>;
+    using range = std::pair<idx_t, idx_t>;
+    const idx_t m = nrows(A);
+    const idx_t n = ncols(B);
+    const idx_t k = ncols(A);
+
+    //find signed max and min of A, B
+    float max_A = -999;
+    float min_A = 999;
+    float max_B = -999;
+    float min_B = 999;
+
+
+    #pragma omp parallel for reduction(max : max_A) collapse(2)
+    for (idx_t j = 0; j < k; j++)
+    {
+        for (idx_t i = 0; i < m; i++)
+        {
+            if ((A(i, j)) > max_A) max_A = (A(i, j));
+        }
+    }
+
+    //find signed max and min in B
+    #pragma omp parallel for reduction(max : max_B) collapse(2)
+    for (idx_t j = 0; j < n; j++)
+    {
+        for (idx_t i = 0; i < k; i++)
+        {
+            if ((B(i, j)) > max_B) max_B = (B(i, j));
+        }
+    }
+
+    auto alpha1 = 1.0/max_A;
+    auto alpha2 =  1.0/max_B;
+
+    auto beta1 = 0.0;
+    auto beta2 = 0.0;
+
+    // squueze into A_dtype and B_dtype
+    #pragma omp parallel for
+    for (idx_t j = 0; j < k; j++)
+    {
+        #pragma omp simd
+        for (idx_t i = 0; i < m; i++)
+        {
+            auto tmp = alpha1*A(i, j) + beta1;
+            A_dtype(i, j) = static_cast<dtype>(tmp);
+            
+        }
+    }
+
+    std::vector<float> B_sums(n, 0);
+    #pragma omp parallel for
+    for (idx_t j = 0; j < n; j++)
+    {
+        #pragma omp simd
+        for (idx_t i = 0; i < k; i++)
+        {
+            auto tmp = alpha2*B(i, j) + beta2;
+            B_dtype(i, j) = static_cast<dtype>(tmp);
+        }
+    }
+    #pragma omp parallel for collapse(2) schedule(dynamic)
+    for (int jj = 0; jj < n; jj += block_size) {
+    for (int ii = 0; ii < m; ii += block_size) {
+        for (int kk = 0; kk < k; kk += block_size) {
+            for (int j = jj; j < jj + block_size; j++) {
+                for (int i = ii; i < ii + block_size; i++)  {
+                    float sum = 0;
+                    #pragma omp simd reduction(+:sum)
+                    for (int l = kk; l < kk + block_size; l++) {
+                        auto first_leftover = static_cast<dtype>(std::pow(2, p+1)*(A(i, l) - static_cast<float>(A_dtype(i, l))/alpha1));
+                        auto second_leftover = static_cast<dtype>(std::pow(2, p+1)*(B(l, j) - static_cast<float>(B_dtype(l, j))/alpha2));
+                        sum += (static_cast<float>(A_dtype(i, l)) * static_cast<float>(B_dtype(l, j)))/(alpha1*alpha2) + std::pow(2.0, -p-1) * (static_cast<float>(first_leftover)*static_cast<float>(B_dtype(l, j))/alpha2 + static_cast<float>(A_dtype(i, l))*static_cast<float>(second_leftover)/alpha1);
+                    }
+                    if (kk + block_size >= k) { // Only scale and subtract in the final kk loop
+                        C(i, j) -= sum;
+                    }
+                }
+            }
+        }
+    }
+}
+
+
 
 
 
