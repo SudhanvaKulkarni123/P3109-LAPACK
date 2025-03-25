@@ -115,13 +115,24 @@ int pivoted_cholesky_left(matrix_t& A, piv_t& left_piv, piv_t& right_piv, chol_m
     {
         
         auto A00 = tlapack::slice(A, range(i*r, (i+1)*r), range(i*r, (i+1)*r));
-        auto A10 = tlapack::slice(A,  range((i+1)*r, n) ,range(i*r, (i+1)*r));
+        auto A10 = tlapack::slice(A, range((i+1)*r, n) ,range(i*r, (i+1)*r));
         auto A01 = tlapack::slice(A ,  range((i)*r, (i+1)*r), range((i+1)*r, n));
         auto A11 = tlapack::slice(A, range(i*r + r, n), range(i*r + r, n));
+
+       
 
         if (can_use_type<gemm_type3>(A11, diag_left ,update_left, tol)) {
             swich = 0;
             cout << " using lowest precision \n"; //8 bit float fp8
+
+            for(int ii = i; ii < q; ii++) {
+                for(int jj = i; jj < q; jj++) {
+
+                    Aiijj = tlapack::slice(A11, range(ii*r, ii*r + r), range(jj*r, jj*r + r));
+                    
+                
+                }
+            }
             std::vector<gemm_type3> buf_L_(r * (n - (i+1)*r));
             auto buf_L = gemm_3_matrix(buf_L_, n - (i+1)*r, r);
             std::vector<gemm_type3> buf_U_(r * (n - (i+1)*r));

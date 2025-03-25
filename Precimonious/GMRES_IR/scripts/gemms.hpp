@@ -44,6 +44,21 @@ void subtract_matrix(const Matrix& A, const Matrix& B, Matrix& C)
     return;
 }
 
+
+template <typename matrix_t>
+void PrintMatrix(const matrix_t& A)
+{
+    for(int i = 0; i < nrows(A); i++)
+    {
+        for(int j = 0; j < ncols(A); j++)
+        {
+            std::cout << A(i,j) << " ";
+        }
+        std::cout << std::endl;
+    }
+
+}
+
 template <typename Matrix>
 void strassen_multiply(Matrix& A, Matrix& B, Matrix& C,
                        Matrix& M, Matrix& tempA, Matrix& tempB, int threshold)
@@ -483,8 +498,159 @@ void fbfmatmul_fp16(matrixA_t& A, matrixA_t& B, matrixA_t& C, matrixB_t& A_dtype
 
 
 
+
+
 template<TLAPACK_MATRIX matrixA_t, TLAPACK_MATRIX matrixB_t, TLAPACK_MATRIX matrixC_t>
 void squeezing_matmul(matrixA_t& A, matrixA_t& B, matrixC_t& C, matrixB_t& A_dtype, matrixB_t& B_dtype, float z1, float z2, int block_size = 4)
+{
+
+ using idx_t  = size_type<matrixA_t>;
+    using T      = type_t<matrixA_t>;
+    using real_t = real_type<T>;
+    using V      = type_t<matrixB_t>;
+    using dtype  = real_type<V>;
+
+    const idx_t m = nrows(A);  // #rows of A
+    const idx_t n = ncols(B);  // #cols of B
+    const idx_t k = ncols(A);  // matching dimension
+
+    //------------------------------------------------
+    // 1) Find maximum (in absolute value) per row of A
+    //------------------------------------------------
+    //   We need a vector of size m (one entry per row)
+    std::vector<float> max_A(m, -999.0f);
+
+    for (idx_t i = 0; i < m; i++)
+    {
+        float local_max = 0.0f;  // or -∞ if you really want
+        for (idx_t j = 0; j < k; j++)
+        {
+            float val = std::abs(A(i, j));
+            if (val > local_max) {
+                local_max = val;
+            }
+        }
+        max_A[i] = local_max;
+    }
+
+    //------------------------------------------------
+    // 2) Find maximum (in absolute value) per column of B
+    //------------------------------------------------
+    //   We need a vector of size n (one entry per column)
+    std::vector<float> max_B(n, -999.0f);
+
+    for (idx_t j = 0; j < n; j++)
+    {
+        float local_max = 0.0f;
+        for (idx_t i = 0; i < k; i++)
+        {
+            float val = std::abs(B(i, j));
+            if (val > local_max) {
+                local_max = val;
+            }
+        }
+        max_B[j] = local_max;
+    }
+
+    //------------------------------------------------
+    // 3) Build alpha1[i] (row scale factors for A)
+    //    and alpha2[j] (column scale factors for B)
+    //------------------------------------------------
+    std::vector<float> alpha1(m), alpha2(n);
+
+    for (idx_t i = 0; i < m; i++) {
+        // Avoid divide-by-zero if a row is entirely zero
+        alpha1[i] = (max_A[i] == 0.0f) ? 1.0f : (1.0f / max_A[0]);
+    }
+    for (idx_t j = 0; j < n; j++) {
+        // Avoid divide-by-zero if a column is entirely zero
+        alpha2[j] = (max_B[j] == 0.0f) ? 1.0f : (1.0f / max_B[0]);
+    }
+
+    float beta1 = 0.0f;
+    float beta2 = 0.0f;
+
+    //------------------------------------------------
+    // 4) Squeeze A into A_dtype, row by row
+    //------------------------------------------------
+#pragma omp parallel for
+    for (idx_t i = 0; i < m; i++)
+    {
+#pragma omp simd
+        for (idx_t j = 0; j < k; j++)
+        {
+            float tmp = alpha1[i]*A(i, j) + beta1;
+            A_dtype(i, j) = static_cast<dtype>(tmp);
+        }
+    }
+
+    //------------------------------------------------
+    // 5) Squeeze B into B_dtype, column by column
+    //------------------------------------------------
+#pragma omp parallel for
+    for (idx_t j = 0; j < n; j++)
+    {
+#pragma omp simd
+        for (idx_t i = 0; i < k; i++)
+        {
+            float tmp = alpha2[j]*B(i, j) + beta2;
+            B_dtype(i, j) = static_cast<dtype>(tmp);
+        }
+    }
+
+    //------------------------------------------------
+    // 6) Blocked multiplication
+    //    Undo scaling with sum / (alpha1[i]*alpha2[j])
+    //------------------------------------------------
+#pragma omp parallel for collapse(2) schedule(dynamic)
+    for (int jj = 0; jj < n; jj += block_size) {
+        for (int ii = 0; ii < m; ii += block_size) {
+
+            for (int kk_ = 0; kk_ < k; kk_ += block_size) {
+
+                for (int j = jj; j < jj + block_size && j < (int)n; j++) {
+                    for (int i = ii; i < ii + block_size && i < (int)m; i++)  {
+
+                        float sum = 0.0f;
+                        for (int l = kk_; l < kk_ + block_size && l < (int)k; l++) {
+                            // partial product is already "compressed"
+                            sum += (static_cast<float>(A_dtype(i, l)) *
+                                    static_cast<float>(B_dtype(l, j)));
+                        }
+
+                        // Only apply final scaling & subtract in the final kk_ block
+                        if (kk_ + block_size >= k) {
+                            // undo row & column scaling
+                            sum /= (alpha1[i] * alpha2[j]);
+                            C(i, j) -= sum;
+                        
+                        }
+                    }
+                }
+
+            } // end of kk_
+        }     // end of ii
+    }         // end of jj
+
+    std::cout << alpha1[0] << "\n";
+
+    return;
+
+
+
+    return;
+
+    
+
+    
+
+
+
+}
+
+
+template<TLAPACK_MATRIX matrixA_t, TLAPACK_MATRIX matrixB_t, TLAPACK_MATRIX matrixC_t>
+void MicroSqueeze_matmul(matrixA_t& A, matrixA_t& B, matrixC_t& C, matrixB_t& A_dtype, matrixB_t& B_dtype, float z1, float z2, int block_size = 4)
 {
 
     using idx_t = size_type<matrixA_t>;
@@ -497,95 +663,40 @@ void squeezing_matmul(matrixA_t& A, matrixA_t& B, matrixC_t& C, matrixB_t& A_dty
     const idx_t n = ncols(B);
     const idx_t k = ncols(A);
 
-    //find signed max and min of A, B
-    float max_A = -999;
-    float min_A = 999;
-    float max_B = -999;
-    float min_B = 999;
+    //block pattern is assumed to be the same as tiling pattern in this functyion.  
+    //TODO - support different blocking pattterns through enum/ OCP class
 
-    #pragma omp parallel for reduction(max : max_A) collapse(2)
-    for (idx_t j = 0; j < k; j++)
-    {
-        for (idx_t i = 0; i < m; i++)
-        {
-            if ((A(i, j)) > max_A) max_A = (A(i, j));
-        }
-    }
-
-    //find signed max and min in B
-    #pragma omp parallel for reduction(max : max_B) collapse(2)
-    for (idx_t j = 0; j < n; j++)
-    {
-
-        for (idx_t i = 0; i < k; i++)
-        {
-            if ((B(i, j)) > max_B) max_B = (B(i, j));
-        }
-    }
-
-    auto alpha1 = 1.0/max_A;
-    auto alpha2 =  1.0/max_B;
-
-    auto beta1 = 0.0;
-    auto beta2 = 0.0;
-
-    // squueze into A_dtype and B_dtype
-    #pragma omp parallel for
-    for (idx_t j = 0; j < k; j++)
-    {
-        #pragma omp simd
-        for (idx_t i = 0; i < m; i++)
-        {
-            auto tmp = alpha1*A(i, j) + beta1;
-            A_dtype(i, j) = static_cast<dtype>(tmp);
-            
-        }
-    }
-
-    std::vector<float> B_sums(n, 0);
-
-    #pragma omp parallel for 
-    for (idx_t j = 0; j < n; j++)
-    {
-        #pragma omp simd
-        for (idx_t i = 0; i < k; i++)
-        {
-            auto tmp = alpha2*B(i, j) + beta2;
-            B_dtype(i, j) = static_cast<dtype>(tmp);
-        }
-    }
+    int mm = (int)m/block_size;
+    int nn = (int)n/block_size;
+    int kk = (int)k/block_size;
 
 
-    #pragma omp parallel for collapse(2) schedule(dynamic)
-    for (int jj = 0; jj < n; jj += block_size) {
-    for (int ii = 0; ii < m; ii += block_size) {
-        for (int kk = 0; kk < k; kk += block_size) {
-            for (int j = jj; j < jj + block_size; j++) {
-                for (int i = ii; i < ii + block_size; i++)  {
-                    float sum = 0;
-                    #pragma omp simd reduction(+:sum)
-                    for (int l = kk; l < kk + block_size; l++) {
-                        sum += (static_cast<float>(A_dtype(i, l)) * static_cast<float>(B_dtype(l, j)));
-                    }
-                    if (kk + block_size >= k) { // Only scale and subtract in the final kk loop
-                        sum = sum / (alpha1 * alpha2);
-                        C(i, j) -= sum;
-                    }
+
+    
+
+    //find max for each block
+
+    for(int i = 0; i < mm; i++) {
+        for(int j = 0; j < nn; j++) {
+
+            for(int ii = 0; ii < block_size; ii++) {
+                for(int jj = 0; jj < block_size ; j++) {
+
+                    
                 }
             }
+
         }
     }
-}
 
 
-    return;
+
+
+
+
+
 
     
-
-    
-
-
-
 }
 
 

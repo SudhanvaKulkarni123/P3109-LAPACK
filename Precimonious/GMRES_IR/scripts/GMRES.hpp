@@ -78,6 +78,23 @@ void printMatrix(const matrix_t& A)
 
 }
 
+template <typename matrix_t>
+void printMin(const matrix_t& A)
+{
+    using T = type_t<matrix_t>;
+    T minA = std::numeric_limits<T>::infinity();
+    for(int i = 0; i < nrows(A); i++)
+    {
+        for(int j = 0; j < ncols(A); j++)
+        {
+            minA = minA < abs(A(i,j)) ? minA : abs(A(i,j));
+        }
+    }
+
+    std::cout << "min is : " << minA << std::endl;
+    return;
+}
+
 
 
 template <typename T>
@@ -728,7 +745,7 @@ void FGMRES(matrixA_t &A, matrixA_B_t& A_B, matrixQ_t &Q, matrixQ_B_t& Q_B, matr
         for(int j = 0; j <n; j++) {
             H(i,j) = 0.0;
             Q(i,j) = 0.0;
-            A_B(i,j) = b_type(ml_dtypes::float8_ieee_p<4>(A_B(i,j)));
+            A_B(i,j) = b_type(float(A_B(i,j)));
         }
     }
     std::vector<scalar_t> be_1(n);

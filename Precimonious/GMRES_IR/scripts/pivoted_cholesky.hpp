@@ -75,12 +75,13 @@ int cholesky_kernel(matrix_t& A, float eta = 1.0, float ksi = 1.0, int N = 1024,
     auto mach_eps = (float)std::numeric_limits<eps_t>::epsilon();
     auto NUN = (float)std::numeric_limits<eps_t>::min();
     auto DUN = (float)std::numeric_limits<eps_t>::denorm_min();
+    DUN = 0.0015;
     auto beta_sq = std::max(eta, std::max(ksi/ (float)sqrt(N*N - 1), (float)mach_eps));
     // if( tmp <= 0 ) { 
     //     tmp = A(i,i) + (float)std::numeric_limits<eps_t>::epsilon(); std::cout << "negative entry! perturbing to preserve +veness";
     // } 
     auto prev_tmp = tmp;
-    if(chol_modif == chol_mod::GMW81)
+    if(phase2 && chol_modif == chol_mod::GMW81)
     {
         tmp = abs(tmp) > DUN*2.0 ? abs(tmp) : DUN*2.0;
         tmp = tmp > b_inf*b_inf/ beta_sq ? tmp : b_inf*b_inf/ beta_sq;
@@ -215,7 +216,7 @@ bool update_diag(matrix_t& L, vector_t& updated_A, matrix_t& A, vector_t& diag_A
 }
 
 template<TLAPACK_SCALAR scalar_t, TLAPACK_VECTOR vector_t, TLAPACK_MATRIX matrix_t>
-bool can_use_type(matrix_t& A, vector_t& diag_A, vector_t& updated_A, double eps_prime)
+bool can_use_type(matrix_t& A, vector_t& diag_A, vector_t& updated_A, double eps_prime, float eps_prod)
 {
     int n = size(diag_A);
 
@@ -274,7 +275,22 @@ int pivoted_cholesky(matrix_t& A, piv_t& left_piv, piv_t& right_piv, chol_mod& c
 
     using gemm_type = float;
     using gemm_type2 =  Eigen::half;
-    using gemm_type3 = ml_dtypes::float8_ieee_p<5>;
+    using gemm_type3 = lo_float::float8_ieee_p<4>;
+    using gemm_type4 = lo_float::float6_p<3>;
+    using gemm_type5 = lo_float::float4_p<2>;
+
+    float mach_eps1  = std::numeric_limits<gemm_type>::epsilon();
+    float mach_eps2  = (float)std::numeric_limits<gemm_type2>::epsilon();
+    float mach_eps3  = (float)std::numeric_limits<gemm_type3>::epsilon();
+    float mach_eps4  = (float)std::numeric_limits<gemm_type4>::epsilon();
+    float mach_eps5  = (float)std::numeric_limits<gemm_type5>::epsilon();
+
+    float eps_prod1 = mach_eps1;
+    float eps_prod2 = (1.0 + mach_eps1) * mach_eps2;
+    float eps_prod3 = (1.0 + mach_eps1) * (1.0 + mach_eps2) * mach_eps3;
+    float eps_prod4 = (1.0 + mach_eps1) * (1.0 + mach_eps2)*(1.0 + mach_eps3) * mach_eps4;
+    float eps_prod5 = (1.0 + mach_eps1) * (1.0 + mach_eps2)*(1.0 + mach_eps3) * (1.0 + mach_eps4) * mach_eps5;
+
 
 
     #ifdef STOCHASTIC_ROUND
@@ -286,6 +302,8 @@ int pivoted_cholesky(matrix_t& A, piv_t& left_piv, piv_t& right_piv, chol_mod& c
     Create<LegacyMatrix<gemm_type, idx_t>> gemm_matrix;
     Create<LegacyMatrix<gemm_type2, idx_t>> gemm_2_matrix;
     Create<LegacyMatrix<gemm_type3, idx_t>> gemm_3_matrix;
+    Create<LegacyMatrix<gemm_type4, idx_t>> gemm_4_matrix;
+    Create<LegacyMatrix<gemm_type5, idx_t>> gemm_5_matrix;
 
     idx_t n = nrows(A);
     int q = n/r;
@@ -356,15 +374,17 @@ int pivoted_cholesky(matrix_t& A, piv_t& left_piv, piv_t& right_piv, chol_mod& c
    
 
     //now the matrix is ready to be Cholesky'd
-    int swich = 3;
+    int swich = 5;
     for(int i = 0; i < q; i++) 
     {
         auto A00 = tlapack::slice(A, range(i*r, (i+1)*r), range(i*r, (i+1)*r));
          
 
         
-        if(swich == 0 || swich == 1) cholesky_kernel<gemm_type3>(A00, eta, ksi, n, chol_modif, phase2);
-        else if(swich == 2) cholesky_kernel<gemm_type2>(A00, eta, ksi, n, chol_modif, phase2);
+        if(swich == 0 || swich == 1) cholesky_kernel<gemm_type5>(A00, eta, ksi, n, chol_modif, phase2);
+        else if(swich == 2) cholesky_kernel<gemm_type4>(A00, eta, ksi, n, chol_modif, phase2);
+        else if(swich == 3) cholesky_kernel<gemm_type3>(A00, eta, ksi, n, chol_modif, phase2);
+        else if(swich == 4) cholesky_kernel<gemm_type2>(A00, eta, ksi, n, chol_modif, phase2);
         else cholesky_kernel<gemm_type>(A00, eta, ksi, n, chol_modif, phase2);
         flop_counter.add_float_flops(r*r*r/3);
         
@@ -410,16 +430,34 @@ int pivoted_cholesky(matrix_t& A, piv_t& left_piv, piv_t& right_piv, chol_mod& c
         if(i*r + r == n) return 0;
 
         //tau = 0.25, mu = 0.001
-        phase2 = update_diag<float>(A10, update_left, A11, diag_left, masks_left, chol_modif, 0.00025, eta, 0.001);
+        phase2 = update_diag<float>(A10, update_left, A11, diag_left, masks_left, chol_modif, 0.99, eta, 0.99);
+        //phase2 = true;
 
         
-
-
-   
-
-        if (can_use_type<gemm_type3>(A11, diag_left ,update_left, tol)) {
+        if (can_use_type<gemm_type5>(A11, diag_left ,update_left, tol, eps_prod5)) {
             swich = 0;
-            cout << " using lowest precision \n"; //8 bit float fp8
+            std::vector<gemm_type5> buf_L_(r * (n - (i+1)*r));
+            auto buf_L = gemm_5_matrix(buf_L_, n - (i+1)*r, r);
+            std::vector<gemm_type5> buf_U_(r * (n - (i+1)*r));
+            auto buf_U = gemm_5_matrix(buf_U_, r, n - (i+1)*r);
+            //diff_matmul<5>(A10, A01, A11, buf_L, buf_U, -1.0, 1.0, r);
+            squeezing_matmul(A10, A01, A11, buf_L, buf_U, -1.0, 1.0, r);
+            //block_gemm(A10, A01, A11, buf_L, buf_U);
+            //scaled_matmul(A10, A01, A11, buf_L, buf_U, r);
+            if(dropping_prob != 1.0) flop_counter.add_fp4_flops(r*(n - (i+1)*r)*(n - (i+1)*r));
+        } else if (can_use_type<gemm_type4>(A11, diag_left ,update_left, tol, eps_prod4)) {
+            swich = 2;
+            std::vector<gemm_type4> buf_L_(r * (n - (i+1)*r));
+            auto buf_L = gemm_4_matrix(buf_L_, n - (i+1)*r, r);
+            std::vector<gemm_type4> buf_U_(r * (n - (i+1)*r));
+            auto buf_U = gemm_4_matrix(buf_U_, r, n - (i+1)*r);
+            //diff_matmul<5>(A10, A01, A11, buf_L, buf_U, -1.0, 1.0, r);
+            squeezing_matmul(A10, A01, A11, buf_L, buf_U, -1.0, 1.0, r);
+            //block_gemm(A10, A01, A11, buf_L, buf_U);
+            //scaled_matmul(A10, A01, A11, buf_L, buf_U, r);
+            if(dropping_prob != 1.0) flop_counter.add_fp6_flops(r*(n - (i+1)*r)*(n - (i+1)*r));
+        } else if (can_use_type<gemm_type3>(A11, diag_left ,update_left, tol, eps_prod3)) {
+            swich = 3;
             std::vector<gemm_type3> buf_L_(r * (n - (i+1)*r));
             auto buf_L = gemm_3_matrix(buf_L_, n - (i+1)*r, r);
             std::vector<gemm_type3> buf_U_(r * (n - (i+1)*r));
@@ -429,19 +467,8 @@ int pivoted_cholesky(matrix_t& A, piv_t& left_piv, piv_t& right_piv, chol_mod& c
             //block_gemm(A10, A01, A11, buf_L, buf_U);
             //scaled_matmul(A10, A01, A11, buf_L, buf_U, r);
             if(dropping_prob != 1.0) flop_counter.add_fp8_flops(r*(n - (i+1)*r)*(n - (i+1)*r));
-        } else if(can_use_ext_type<gemm_type3>(A11, diag_left ,update_left, tol)) {
-            swich = 1;
-            cout << " using lowest extended precision \n"; //8 bit float fp8
-            std::vector<gemm_type3> buf_L_(r * (n - (i+1)*r));
-            auto buf_L = gemm_3_matrix(buf_L_, n - (i+1)*r, r);
-            std::vector<gemm_type3> buf_U_(r * (n - (i+1)*r));
-            auto buf_U = gemm_3_matrix(buf_U_, r, n - (i+1)*r);
-            diff_matmul<5>(A10, A01, A11, buf_L, buf_U, -1.0, 1.0, r);
-            if(dropping_prob != 1.0) flop_counter.add_fp8_flops(2*r*(n - (i+1)*r)*(n - (i+1)*r));
-            
-        } else if(can_use_type<gemm_type2>(A11, diag_left , update_left, tol)) {
-            swich = 2;
-            cout << " using middle precision \n"; //16 bit float
+        } else if(can_use_type<gemm_type2>(A11, diag_left , update_left, tol, eps_prod2)) {
+            swich = 4;
             std::vector<gemm_type2> buf_L_(r * (n - (i+1)*r));
             auto buf_L = gemm_2_matrix(buf_L_, n - (i+1)*r, r);
             std::vector<gemm_type2> buf_U_(r * (n - (i+1)*r));
@@ -450,8 +477,7 @@ int pivoted_cholesky(matrix_t& A, piv_t& left_piv, piv_t& right_piv, chol_mod& c
             //squeezing_matmul(A10, A01, A11, buf_L, buf_U, -1.0, 1.0);
             flop_counter.add_half_flops(r*(n - (i+1)*r)*(n - (i+1)*r));
         } else {
-            swich = 3;
-            cout << " using highest precision \n"; //32 bit float 
+            swich = 5;
             std::vector<gemm_type> buf_L_(r * (n - (i+1)*r));
             auto buf_L = gemm_matrix(buf_L_, n - (i+1)*r, r);
             std::vector<gemm_type> buf_U_(r * (n - (i+1)*r));

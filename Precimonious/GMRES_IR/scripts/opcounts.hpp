@@ -35,7 +35,7 @@ double adjust_weight<Eigen::half>(double unweighted)
 }
 
 template<>
-double adjust_weight<ml_dtypes::float8_ieee_p<4>>(double unweighted)
+double adjust_weight<lo_float::float8_ieee_p<4>>(double unweighted)
 {
     return unweighted;
 }

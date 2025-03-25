@@ -1,4 +1,4 @@
-// This file computes the sol of Ax = b with a preconditioned CG (preconditioned with a switching precision Cholesky)
+// This file computes the sol of Ax = b with a preconditioned GMRES (FGMRESee) (preconditioned with a switching precision Cholesky)
 ///  @author Sudhanva Kulkarni
 
 #define PY_SSIZE_T_CLEAN

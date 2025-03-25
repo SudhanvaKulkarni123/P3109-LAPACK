@@ -5,11 +5,11 @@
 #include <Python.h>
 #define TLAPACK_PREFERRED_MATRIX_LEGACY
 #include <tlapack/plugins/legacyArray.hpp>
-#include <tlapack/plugins/stdvector.hpp>
-#include <tlapack/plugins/float8_iee_p.hpp>
+#include <tlapack/plugins/stdvector.hpp> 
+
 #include <tlapack/plugins/eigen_bfloat.hpp>
 #include <tlapack/plugins/eigen_half.hpp>
-#include "opcounts.hpp"
+#include <tlapack/plugins/lo_float_sci.hpp>
 #include <tlapack/blas/axpy.hpp>
 #include <tlapack/blas/dot.hpp>
 #include <tlapack/blas/nrm2.hpp>
@@ -44,6 +44,7 @@
 #include "json_utils.hpp"
 #include "num_ops.hpp"
 #include "pivoted_cholesky.hpp"
+//#include "sparse_structs.hpp"
 
 
 
@@ -56,11 +57,14 @@ template <typename F0, typename F1, typename T2, typename T3, typename T4, typen
 double CG_IR(int n, double scale, float cond, factorization_type fact_type, double switching_val, double tolerance, double conv_thresh, float work_factor, bool is_symmetric, bool diag_dom, float dropping_prob, chol_mod chol_modif, int prec, int variant = 0, int num_iter_1 = 0, int num_total_iter = 5, kernel_type precond_mode = kernel_type::LEFT_LU, int max_CG_iter = 20, int inner_num_gmres_iter = 20, int num_IR_iter = 20, refinement_type method = refinement_type::CG_IR, int block_size = 128, int stopping_pos = 99999)
 {
 
-    using real_t = tlapack::real_type<ml_dtypes::float8_ieee_p<4>>;
     using idx_t = size_t;
     using range = pair<idx_t, idx_t>;
 
-    double d_conv_bound = sqrt(static_cast<double>(n)) * std::pow(2, -53);
+
+
+    // auto TR = lo_float::float6_p<3>(1.0);
+
+    double d_conv_bound = sqrt(static_cast<double>(n)) * std::pow(2, -32);
     double s_conv_bound = sqrt(static_cast<double>(n)) * std::pow(2, -24);
 
     n_flops mixed_prec_flops(work_factor); mixed_prec_flops.reset();
@@ -71,6 +75,8 @@ double CG_IR(int n, double scale, float cond, factorization_type fact_type, doub
     //cholesky flops is just n^3/3
     auto nn = (long) n;
     cholesky_flops.add_double_flops(nn*nn*(nn/3));
+
+
 
     
 
@@ -289,7 +295,7 @@ double CG_IR(int n, double scale, float cond, factorization_type fact_type, doub
 
     //before we copy A to LL, we need to equilibrate it
     std::vector<double> D(n, 1.0);
-    for(int i = 0; i < n; i++) D[i] = std::pow(2.0, (-(int)log2(A(i,i)))/2);
+    for(int i = 0; i < n; i++) D[i] = 1.0;
     //for(int i = n/2; i  < n; i++) D[i] = std::pow(2.0, -(int)log2(A(i,i))); 
 
     for(int i = 0; i < n; i++) {
@@ -306,7 +312,11 @@ double CG_IR(int n, double scale, float cond, factorization_type fact_type, doub
     int info = pivoted_cholesky(LL, left_piv, right_piv, chol_modif, mixed_fact_flops ,block_size, tolerance, dropping_prob);
     cout << "make high prec copy after cholesky \n";
 
+    std::cout << "matrix after cholesky : \n";
+
+
     tlapack::lacpy(tlapack::GENERAL, LL, LL_copy);
+
 
     
  
@@ -339,15 +349,30 @@ double CG_IR(int n, double scale, float cond, factorization_type fact_type, doub
     //first scale b
     for(int i = 0; i < n; i++) b_3[i] *= D[i];
     mixed_prec_flops.add_float_flops(n);
+    std::cout << "norm of b before pivoting\n";
+    double dnormb = inf_norm(b_3);
+    std::cout << dnormb << std::endl;
+
     for (int i = 0; i < n; i++)
     {
         auto tmp = b_3[left_piv[i]];
         b_3[left_piv[i]] = b_3[i];
         b_3[i] = tmp;
     }
+    std::cout << "norm of b before trsv\n";
+    dnormb = inf_norm(b_3);
+    std::cout << dnormb << std::endl;
 
+
+    std::cout << "norm of LL^T : "  << tlapack::lange(tlapack::Norm::Inf, LL_copy) << std::endl;
+    
+    
     tlapack::trsv(tlapack::LOWER_TRIANGLE, tlapack::NO_TRANS, Diag::NonUnit, LL_copy, b_3);
     tlapack::trsv(tlapack::LOWER_TRIANGLE, tlapack::TRANSPOSE, Diag::NonUnit, LL_copy, b_3);
+    std::cout << "norm of b after trsv\n";
+    dnormb = inf_norm(b_3);
+    std::cout << dnormb << std::endl;
+
     mixed_prec_flops.add_float_flops(2*n*n);
 
     for (int i = n-1; i >= 0; i--)
@@ -356,6 +381,10 @@ double CG_IR(int n, double scale, float cond, factorization_type fact_type, doub
         b_3[right_piv[i]] = b_3[i];
         b_3[i] = tmp;
     }
+
+    std::cout << "norm of b after pivoting\n";
+   dnormb = inf_norm(b_3);
+    std::cout << dnormb << std::endl;
 
     for(int i = 0; i < n ;i++) b_3[i] *= D[i];
     mixed_prec_flops.add_float_flops(n);
@@ -403,9 +432,8 @@ double CG_IR(int n, double scale, float cond, factorization_type fact_type, doub
     int count = 0;
     
 
-    // Allocate necessary vectors
-    std::vector<double> z(n); // Preconditioned vector
-    std::vector<double> p(n); // Search direction
+    std::vector<double> z(n); 
+    std::vector<double> p(n); 
     std::vector<double> temp_p(n);
     std::vector<double> Ap(n); // A * p
 
@@ -413,28 +441,28 @@ double CG_IR(int n, double scale, float cond, factorization_type fact_type, doub
 
     // Compute initial preconditioned residual z = M^{-1} * r
     // Preconditioning steps:
-    // 1. Scale by D
+
     for(int i = 0; i < n; i++) {
         z[i] = r[i] * D[i];
     }
     mixed_prec_flops.add_double_flops(n);
     
-    // 2. Apply left permutation (P^T)
+    // Apply pivot P^T
     for (int i = 0; i < n; i++) {
         auto tmp = z[left_piv[i]];
         z[left_piv[i]] = z[i];
         z[i] = tmp;
     }
     
-    // 3. Solve L y = P^T D r
+    // solve with L and L^T
     tlapack::trsv(tlapack::LOWER_TRIANGLE, tlapack::NO_TRANS, tlapack::Diag::NonUnit, LL_copy, z);
     mixed_prec_flops.add_double_flops(n*n);
     
-    // 4. Solve L^T y = y
+
     tlapack::trsv(tlapack::LOWER_TRIANGLE, tlapack::TRANSPOSE, tlapack::Diag::NonUnit, LL_copy, z);
     mixed_prec_flops.add_double_flops(n*n);
 
-    // 5. Apply right permutation (P) to y
+    //apply P
     for (int i = n-1; i >= 0; i--) {
         auto tmp = z[right_piv[i]];
         z[right_piv[i]] = z[i];
@@ -460,9 +488,8 @@ double CG_IR(int n, double scale, float cond, factorization_type fact_type, doub
     mixed_prec_flops.add_double_flops(n);
 
     int p_iter = 0;
-    // Start CG iterations
     for (int j = 0; j < max_CG_iter; j++) {
-        // Compute Ap = A * p
+        //Ap = A * p
         tlapack::gemv(tlapack::NO_TRANS, 1.0, FG, p, 0.0, Ap);
         mixed_prec_flops.add_double_flops(2*n*n);
         
@@ -511,35 +538,35 @@ double CG_IR(int n, double scale, float cond, factorization_type fact_type, doub
         }
         
         // Precondition the new residual z = M^{-1} * r
-        // 1. Scale by D
+        // Scale by D
         for(int i = 0; i < n; i++) {
             z[i] = r[i] * D[i];
         }
         mixed_prec_flops.add_double_flops(n);
         
-        // 2. Apply left permutation (P^T)
+        // Apply left permutation (P^T)
         for (int i = 0; i < n; i++) {
             auto tmp = z[left_piv[i]];
             z[left_piv[i]] = z[i];
             z[i] = tmp;
         }
         
-        // 3. Solve L y = P^T D r
+        // Solve L y = P^T D r
         tlapack::trsv(tlapack::LOWER_TRIANGLE, tlapack::NO_TRANS, tlapack::Diag::NonUnit, LL_copy, z);
         mixed_prec_flops.add_double_flops(n*n);
         
-        // 4. Solve L^T y = y
+        // Solve L^T y = y
         tlapack::trsv(tlapack::LOWER_TRIANGLE, tlapack::TRANSPOSE, tlapack::Diag::NonUnit, LL_copy, z);
         mixed_prec_flops.add_double_flops(n*n);
         
-        // 5. Apply right permutation (P) to y
+        // Apply right permutation (P) to y
         for (int i = n-1; i >= 0; i--) {
             auto tmp = z[right_piv[i]];
             z[right_piv[i]] = z[i];
             z[i] = tmp;
         }
         
-        // 6. Scale by D again
+        // Scale by D again
         for(int i = 0; i < n; i++) {
             z[i] *= D[i];
         }
@@ -582,15 +609,8 @@ double CG_IR(int n, double scale, float cond, factorization_type fact_type, doub
     double final_inf_norm_r = inf_norm(r);
     double final_backward_error = final_inf_norm_r / (inf_norm(x) * normA);
     std::cout << "Final backward error: " << final_backward_error << std::endl;
-    
-    // Compute forward error if exact solution bd is known
-        std::vector<double> error(n, 0.0);
-        // for(int i = 0; i < n; i++) {
-        //     error[i] = x[i] - bd[i];
-        // }
-        // double forward_error = inf_norm(error) / inf_norm(bd);
-        // std::cout << "Forward error is: " << forward_error << std::endl;
-    
+
+    std::vector<double> error(n, 0.0);
     
     // Optional: Compute norm of x
     std::cout << "Norm of x is: " << inf_norm(x) << std::endl;
@@ -674,6 +694,7 @@ double CG_IR(int n, double scale, float cond, factorization_type fact_type, doub
     cout << "flops for Cholesky : \n";
     mixed_fact_flops.print_stats();
     std::cout << " total effective work for mixed Cholesky (normalized to fp8): \n";
+    std::cout << " fraction of FLOPs done in fp8 is : " << (double)mixed_fact_flops.get_fp8_flops()/ (double) mixed_fact_flops.total_flops() << "\n";
     std::cout << mixed_fact_flops.report_total() << std::endl;
     cout << "flops for CG with precond : \n";
     mixed_prec_flops.print_stats();
@@ -683,11 +704,20 @@ double CG_IR(int n, double scale, float cond, factorization_type fact_type, doub
     cholesky_flops.print_stats();
 
 
+    std::cout << "stats for full mixed precision algorithm (mixed Cholesky + CG)\n";
+    mixed_fact_flops.add_struct(mixed_prec_flops);
+    mixed_fact_flops.print_stats();
+
+
     
 
     cout << " improvement in number of flops is : \n";
     std::vector<n_flops> Cholesky_flops = {mixed_fact_flops, mixed_prec_flops};
+    cout << "improvemenyt over fp64 CG \n";
     cout << 1.0/reg_flops.compare_with(Cholesky_flops) << "\n";
+    cout << "--------------------------------------------------\n";
+    cout << "improvement over fp64 Cholesky \n";
+    cout << 1.0/cholesky_flops.compare_with(Cholesky_flops) << "\n";
 
     std::cout << "logging results...... \n";
 
@@ -707,6 +737,8 @@ double CG_IR(int n, double scale, float cond, factorization_type fact_type, doub
     newfile << "number of iterations for vanilla_CG : " << v_iters << "\n";
     newfile << "vanilla Cholesky flops : \n";
     cholesky_flops.log_results(newfile);
+
+
 
     newfile.close();
 
@@ -756,7 +788,7 @@ int main(int argc, char **argv)
     std::cout << "set refinement params" << std::endl;
 
     std::cout << "beginning factorization" << std::endl;
-    er3 += CG_IR<ml_dtypes::float8_ieee_p<6>, Eigen::half, double, double, double, double, double>(n, scaling_factor, static_cast<float>(cond), fact_type, switching_val, tolerance, conv_thresh, work_factor, is_symmetric, diag_dom, dropping_prob, chol_modif, 999, 0, num_iter_1, total_num_iter, precond_kernel, max_gmres_iter, inner_gmres_num, num_IR_iter, refinement_method, block_size, stopping_pos);
+    er3 += CG_IR<float, Eigen::half, double, double, double, double, double>(n, scaling_factor, static_cast<float>(cond), fact_type, switching_val, tolerance, conv_thresh, work_factor, is_symmetric, diag_dom, dropping_prob, chol_modif, 999, 0, num_iter_1, total_num_iter, precond_kernel, max_gmres_iter, inner_gmres_num, num_IR_iter, refinement_method, block_size, stopping_pos);
 
     bool verified = abs(er3) < 1e-8;
     FILE *fp = fopen("./log.txt", "w");
