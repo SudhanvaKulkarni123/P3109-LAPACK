@@ -10,10 +10,9 @@ struct n_flops {
     long n_flops_fp8;
     long n_flops_fp6;
     long n_flops_fp4;
-    float work_factor;
 
 public:
-    n_flops(float WF = 2.0) : n_flops_double(0), n_flops_float(0), n_flops_half(0), n_flops_bfloat(0), n_flops_fp8(0), n_flops_fp6(0), n_flops_fp4(0), work_factor(WF) {}
+    n_flops() : n_flops_double(0), n_flops_float(0), n_flops_half(0), n_flops_bfloat(0), n_flops_fp8(0), n_flops_fp6(0), n_flops_fp4(0){}
 
     void reset() {
         n_flops_double = 0;
